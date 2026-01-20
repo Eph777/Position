@@ -1,30 +1,33 @@
 import os
 import datetime
 from flask import Flask, request, jsonify
-import psycopg2
-from psycopg2 import pool
+import mysql.connector
+from mysql.connector import pooling, Error
 
 app = Flask(__name__)
 
 # Database configuration - Update these with your actual credentials
 DB_HOST = os.environ.get("DB_HOST", "localhost")
 DB_NAME = os.environ.get("DB_NAME", "luanti_db")
-DB_USER = os.environ.get("DB_USER", "postgres")
+DB_USER = os.environ.get("DB_USER", "luanti")
 DB_PASS = os.environ.get("DB_PASS", "password")
+DB_PORT = int(os.environ.get("DB_PORT", "3306"))
 
 # Initialize connection pool
 try:
-    postgreSQL_pool = psycopg2.pool.SimpleConnectionPool(
-        1, 20,
+    mysql_pool = mysql.connector.pooling.MySQLConnectionPool(
+        pool_name="luanti_pool",
+        pool_size=20,
+        pool_reset_session=True,
         host=DB_HOST,
         database=DB_NAME,
         user=DB_USER,
-        password=DB_PASS
+        password=DB_PASS,
+        port=DB_PORT
     )
-    if postgreSQL_pool:
-        print("Connection pool created successfully")
-except (Exception, psycopg2.DatabaseError) as error:
-    print("Error while connecting to PostgreSQL", error)
+    print("MySQL connection pool created successfully")
+except Error as error:
+    print(f"Error while connecting to MySQL: {error}")
 
 @app.route('/position', methods=['POST'])
 def log_position():
@@ -45,7 +48,7 @@ def log_position():
     # Insert into database
     conn = None
     try:
-        conn = postgreSQL_pool.getconn()
+        conn = mysql_pool.get_connection()
         cursor = conn.cursor()
         query = """
             INSERT INTO player_traces (player_name, x, y, z)
@@ -55,14 +58,14 @@ def log_position():
         conn.commit()
         cursor.close()
         return jsonify({"status": "success"}), 201
-    except (Exception, psycopg2.DatabaseError) as error:
+    except Error as error:
         if conn:
             conn.rollback()
         print(f"Error saving trace: {error}")
         return jsonify({"error": "Database error"}), 500
     finally:
-        if conn:
-            postgreSQL_pool.putconn(conn)
+        if conn and conn.is_connected():
+            conn.close()
 
 @app.route('/', methods=['GET'])
 def health_check():
