@@ -163,8 +163,53 @@ echo "secure.http_mods = position_tracker" > ${USER_HOME}/snap/luanti/common/.mi
 
 print_info "Luanti setup complete!"
 
-# Step 7: Create systemd service
-print_info "Step 7/9: Creating systemd service..."
+# Step 7: Check for port conflicts and create systemd service
+print_info "Step 7/9: Checking for port conflicts..."
+
+# Check if port 5000 is in use
+PORT_IN_USE=$(sudo lsof -i :5000 -t 2>/dev/null)
+
+if [ ! -z "$PORT_IN_USE" ]; then
+    print_warning "Port 5000 is already in use!"
+    
+    # Try to identify the process
+    PROCESS_INFO=$(sudo lsof -i :5000 | grep LISTEN)
+    echo "$PROCESS_INFO"
+    
+    # Check if it's the PostgreSQL tracker service
+    if systemctl is-active --quiet luanti-tracker-postgresql; then
+        print_warning "Found PostgreSQL tracker service running on port 5000."
+        echo ""
+        read -p "Do you want to stop the PostgreSQL service and continue with MySQL? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_info "Stopping PostgreSQL tracker service..."
+            sudo systemctl stop luanti-tracker-postgresql
+            sudo systemctl disable luanti-tracker-postgresql
+            print_info "PostgreSQL service stopped."
+        else
+            print_error "Cannot proceed while port 5000 is in use. Exiting."
+            exit 1
+        fi
+    else
+        # Unknown process on port 5000
+        print_warning "An unknown process is using port 5000."
+        echo ""
+        read -p "Do you want to kill this process and continue? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_info "Stopping process on port 5000..."
+            sudo kill -9 $PORT_IN_USE
+            sleep 2
+            print_info "Process stopped."
+        else
+            print_error "Cannot proceed while port 5000 is in use. Exiting."
+            exit 1
+        fi
+    fi
+fi
+
+print_info "Creating systemd service..."
 
 sudo tee /etc/systemd/system/luanti-tracker.service > /dev/null <<EOF
 [Unit]

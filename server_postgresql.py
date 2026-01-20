@@ -66,6 +66,63 @@ def log_position():
         if conn:
             postgresql_pool.putconn(conn)
 
+@app.route('/traces', methods=['GET'])
+def get_traces():
+    """
+    Retrieves player traces from the database.
+    Optional query parameters:
+    - player: filter by player name
+    - limit: number of records to return (default: 100)
+    """
+    player_name = request.args.get('player')
+    limit = request.args.get('limit', 100, type=int)
+    
+    conn = None
+    try:
+        conn = postgresql_pool.getconn()
+        cursor = conn.cursor()
+        
+        if player_name:
+            query = """
+                SELECT id, player_name, x, y, z, timestamp
+                FROM player_traces
+                WHERE player_name = %s
+                ORDER BY timestamp DESC
+                LIMIT %s
+            """
+            cursor.execute(query, (player_name, limit))
+        else:
+            query = """
+                SELECT id, player_name, x, y, z, timestamp
+                FROM player_traces
+                ORDER BY timestamp DESC
+                LIMIT %s
+            """
+            cursor.execute(query, (limit,))
+        
+        rows = cursor.fetchall()
+        cursor.close()
+        
+        # Convert to list of dictionaries
+        traces = []
+        for row in rows:
+            traces.append({
+                "id": row[0],
+                "player_name": row[1],
+                "x": row[2],
+                "y": row[3],
+                "z": row[4],
+                "timestamp": row[5].isoformat() if row[5] else None
+            })
+        
+        return jsonify({"count": len(traces), "traces": traces}), 200
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(f"Error retrieving traces: {error}")
+        return jsonify({"error": "Database error"}), 500
+    finally:
+        if conn:
+            postgresql_pool.putconn(conn)
+
 @app.route('/', methods=['GET'])
 def health_check():
     return jsonify({"status": "running"}), 200
