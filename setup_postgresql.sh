@@ -75,6 +75,22 @@ sudo snap install luanti
 # Step 4: Configure PostgreSQL
 print_info "Step 4/9: Configuring PostgreSQL..."
 
+# Configure authentication method
+print_info "Configuring PostgreSQL authentication..."
+PG_HBA_CONF=$(sudo -u postgres psql -t -P format=unaligned -c 'SHOW hba_file;')
+print_info "PostgreSQL config file: $PG_HBA_CONF"
+
+# Backup original pg_hba.conf
+sudo cp "$PG_HBA_CONF" "${PG_HBA_CONF}.backup"
+
+# Update pg_hba.conf to use md5 authentication for local connections
+sudo sed -i 's/^local\s\+all\s\+all\s\+peer$/local   all             all                                     md5/' "$PG_HBA_CONF"
+
+# Reload PostgreSQL to apply changes
+sudo systemctl reload postgresql
+
+print_info "PostgreSQL authentication configured!"
+
 # Create database and user
 print_info "Creating database and user..."
 sudo -u postgres psql <<EOF
