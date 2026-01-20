@@ -24,10 +24,14 @@ print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-# Check if running as root
-if [ "$EUID" -eq 0 ]; then 
-   print_error "Please do not run this script as root. Run as a regular user with sudo privileges."
-   exit 1
+# Determine if running as root
+if [ "$EUID" -eq 0 ]; then
+    print_warning "Running as root user."
+    USER_HOME="/root"
+    CURRENT_USER="root"
+else
+    USER_HOME="$HOME"
+    CURRENT_USER=$(whoami)
 fi
 
 # Configuration
@@ -35,7 +39,7 @@ DB_NAME="luanti_db"
 DB_USER="luanti"
 DB_PASS="luanti123"
 DB_ROOT_PASS="mysql_root_123"
-PROJECT_DIR="$HOME/Position"
+PROJECT_DIR="${USER_HOME}/Position"
 PYTHON_VERSION="python3"
 
 print_info "=== Luanti Position Tracker - MySQL Setup ==="
@@ -128,34 +132,34 @@ print_info "Python application setup complete!"
 print_info "Step 6/9: Installing Luanti game content..."
 
 # Create directories
-mkdir -p ~/snap/luanti/common/.minetest/games
-mkdir -p ~/snap/luanti/common/.minetest/worlds/myworld
-mkdir -p ~/snap/luanti/common/.minetest/mods
+mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/games
+mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld
+mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/mods
 
 # Clone Minetest Game
-if [ ! -d ~/snap/luanti/common/.minetest/games/minetest_game ]; then
+if [ ! -d ${USER_HOME}/snap/luanti/common/.minetest/games/minetest_game ]; then
     print_info "Downloading Minetest Game..."
-    git clone https://github.com/minetest/minetest_game.git ~/snap/luanti/common/.minetest/games/minetest_game
+    git clone https://github.com/minetest/minetest_game.git ${USER_HOME}/snap/luanti/common/.minetest/games/minetest_game
 else
     print_info "Minetest Game already exists, skipping..."
 fi
 
 # Create world configuration
 print_info "Creating world configuration..."
-echo "gameid = minetest_game" > ~/snap/luanti/common/.minetest/worlds/myworld/world.mt
-echo "backend = sqlite3" >> ~/snap/luanti/common/.minetest/worlds/myworld/world.mt
-echo "load_mod_position_tracker = true" >> ~/snap/luanti/common/.minetest/worlds/myworld/world.mt
+echo "gameid = minetest_game" > ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld/world.mt
+echo "backend = sqlite3" >> ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld/world.mt
+echo "load_mod_position_tracker = true" >> ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld/world.mt
 
 # Copy mod
 print_info "Installing position tracker mod..."
-cp -r "$PROJECT_DIR/mod" ~/snap/luanti/common/.minetest/mods/position_tracker
+cp -r "$PROJECT_DIR/mod" ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker
 
 # Configure mod
 print_info "Configuring mod..."
-sed -i 's|local SERVER_URL = .*|local SERVER_URL = "http://localhost:5000/position"|' ~/snap/luanti/common/.minetest/mods/position_tracker/init.lua
+sed -i 's|local SERVER_URL = .*|local SERVER_URL = "http://localhost:5000/position"|' ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker/init.lua
 
 # Create minetest.conf
-echo "secure.http_mods = position_tracker" > ~/snap/luanti/common/.minetest/minetest.conf
+echo "secure.http_mods = position_tracker" > ${USER_HOME}/snap/luanti/common/.minetest/minetest.conf
 
 print_info "Luanti setup complete!"
 
@@ -169,7 +173,7 @@ After=network.target mysql.service
 
 [Service]
 Type=simple
-User=$(whoami)
+User=${CURRENT_USER}
 WorkingDirectory=$PROJECT_DIR
 Environment="PATH=$PROJECT_DIR/venv/bin"
 EnvironmentFile=$PROJECT_DIR/.env
@@ -200,12 +204,12 @@ print_info "Firewall configured!"
 # Step 9: Create Luanti server start script
 print_info "Step 9/9: Creating Luanti server start script..."
 
-cat > ~/start-luanti-server.sh <<'EOF'
+cat > ${USER_HOME}/start-luanti-server.sh <<'EOF'
 #!/bin/bash
 /snap/bin/luanti --server --world ~/snap/luanti/common/.minetest/worlds/myworld --gameid minetest_game --port 30000
 EOF
 
-chmod +x ~/start-luanti-server.sh
+chmod +x ${USER_HOME}/start-luanti-server.sh
 
 print_info "Luanti server start script created!"
 
