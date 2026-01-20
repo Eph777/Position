@@ -1,19 +1,23 @@
-# Luanti Player Position Tracker - Server Setup Guide
+# Luanti Player Position Tracker - PostgreSQL Setup Guide
 
-This guide provides step-by-step instructions for deploying the Luanti Player Position Tracker on a remote server with MySQL database. This system tracks player positions from your Luanti game server and stores them in a MySQL database for analysis.
+This guide provides step-by-step instructions for deploying the Luanti Player Position Tracker on a remote server with **PostgreSQL database**. This system tracks player positions from your Luanti game server and stores them in a PostgreSQL database for analysis.
+
+> [!NOTE]
+> This is the **PostgreSQL version** of the setup guide. If you prefer MySQL, see [SETUP_GUIDE.md](SETUP_GUIDE.md).
 
 ## Table of Contents
 
 1. [System Overview](#system-overview)
 2. [Prerequisites](#prerequisites)
 3. [Server Setup](#server-setup)
-4. [MySQL Installation and Configuration](#mysql-installation-and-configuration)
+4. [PostgreSQL Installation and Configuration](#postgresql-installation-and-configuration)
 5. [Python Application Setup](#python-application-setup)
-6. [Luanti Mod Installation](#luanti-mod-installation)
-7. [Luanti Client Configuration](#luanti-client-configuration)
-8. [Testing and Verification](#testing-and-verification)
-9. [Troubleshooting](#troubleshooting)
-10. [Security Considerations](#security-considerations)
+6. [Luanti Server Installation](#luanti-server-installation)
+7. [Luanti Mod Installation](#luanti-mod-installation)
+8. [Luanti Client Configuration](#luanti-client-configuration)
+9. [Testing and Verification](#testing-and-verification)
+10. [Troubleshooting](#troubleshooting)
+11. [Security Considerations](#security-considerations)
 
 ---
 
@@ -24,13 +28,13 @@ The system consists of three components:
 ```mermaid
 graph LR
     A[Luanti Game Server<br/>with Mod] -->|HTTP POST| B[Python Flask Server<br/>port 5000]
-    B -->|SQL INSERT| C[MySQL Database]
+    B -->|SQL INSERT| C[PostgreSQL Database]
     D[Luanti Client] -->|Connects to| A
 ```
 
 1. **Luanti Mod**: Runs on the game server, tracks player positions every second
-2. **Python Flask Server**: Receives HTTP requests and stores data in MySQL
-3. **MySQL Database**: Stores player position traces with timestamps
+2. **Python Flask Server**: Receives HTTP requests and stores data in PostgreSQL
+3. **PostgreSQL Database**: Stores player position traces with timestamps
 
 ---
 
@@ -44,7 +48,7 @@ graph LR
 - **Network**: Public IP address or domain name (for remote access)
 - **Ports**: 
   - Port 5000 (Python Flask server)
-  - Port 3306 (MySQL - can be restricted to localhost)
+  - Port 5432 (PostgreSQL - can be restricted to localhost)
   - Port 30000 (Luanti game server - default)
 
 ### Local Requirements
@@ -75,70 +79,66 @@ sudo apt upgrade -y
 ### Step 3: Install Required System Packages
 
 ```bash
-sudo apt install -y python3 python3-pip python3-venv git mysql-server
+sudo apt install -y python3 python3-pip python3-venv git postgresql postgresql-contrib
 ```
 
 ---
 
-## MySQL Installation and Configuration
+## PostgreSQL Installation and Configuration
 
-### Step 1: Secure MySQL Installation
-
-Run the MySQL security script:
+### Step 1: Verify PostgreSQL is Running
 
 ```bash
-sudo mysql_secure_installation
+sudo systemctl status postgresql
 ```
 
-Follow the prompts:
-- Set a strong root password
-- Remove anonymous users: **Yes**
-- Disallow root login remotely: **Yes** (recommended)
-- Remove test database: **Yes**
-- Reload privilege tables: **Yes**
+You should see "active (running)" in green.
 
 ### Step 2: Create Database and User
 
-Login to MySQL as root:
+Switch to the PostgreSQL user and access the PostgreSQL prompt:
 
 ```bash
-sudo mysql -u root -p
+sudo -u postgres psql
 ```
 
 Execute the following SQL commands:
 
 ```sql
 -- Create the database
-CREATE DATABASE luanti_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE luanti_db;
 
 -- Create a dedicated user for the application
-CREATE USER 'luanti'@'localhost' IDENTIFIED BY 'luanti123';
+CREATE USER luanti WITH PASSWORD 'postgres123';
 
 -- Grant privileges
-GRANT ALL PRIVILEGES ON luanti_db.* TO 'luanti'@'localhost';
+GRANT ALL PRIVILEGES ON DATABASE luanti_db TO luanti;
 
--- Apply changes
-FLUSH PRIVILEGES;
+-- Connect to the database
+\c luanti_db
+
+-- Grant schema privileges (PostgreSQL 15+)
+GRANT ALL ON SCHEMA public TO luanti;
 
 -- Verify the database was created
-SHOW DATABASES;
+\l
 
--- Exit MySQL
-EXIT;
+-- Exit PostgreSQL
+\q
 ```
 
 > [!NOTE]
-> For development, we're using the simple password `luanti123`. For production deployments, use a strong, unique password.
+> For development, we're using the simple password `postgres123`. For production deployments, use a strong, unique password.
 
 ### Step 3: Import the Schema
 
 Navigate to your project directory (we'll create this in the next section) and import the schema:
 
 ```bash
-mysql -u luanti -p luanti_db < schema.sql
+psql -U luanti -d luanti_db -f schema_postgresql.sql
 ```
 
-Enter the password (`luanti123`) when prompted.
+Enter the password (`postgres123`) when prompted.
 
 ---
 
@@ -182,7 +182,7 @@ Your terminal prompt should now show `(venv)` at the beginning.
 
 ```bash
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements_postgresql.txt
 ```
 
 ### Step 4: Configure Environment Variables
@@ -190,7 +190,7 @@ pip install -r requirements.txt
 Create your environment configuration file:
 
 ```bash
-cp .env.example .env
+cp .env.example.postgresql .env
 nano .env
 ```
 
@@ -200,8 +200,8 @@ Update the values in `.env`:
 DB_HOST=localhost
 DB_NAME=luanti_db
 DB_USER=luanti
-DB_PASS=luanti123
-DB_PORT=3306
+DB_PASS=postgres123
+DB_PORT=5432
 ```
 
 Save and exit (Ctrl+X, then Y, then Enter).
@@ -209,7 +209,7 @@ Save and exit (Ctrl+X, then Y, then Enter).
 ### Step 5: Import Database Schema
 
 ```bash
-mysql -u luanti -p luanti_db < schema.sql
+psql -U luanti -d luanti_db -f schema_postgresql.sql
 ```
 
 Enter the password when prompted.
@@ -223,13 +223,13 @@ First, load the environment variables and start the server:
 export $(cat .env | xargs)
 
 # Start the Flask server
-python3 server.py
+python3 server_postgresql.py
 ```
 
 You should see:
 
 ```
-MySQL connection pool created successfully
+PostgreSQL connection pool created successfully
  * Running on http://0.0.0.0:5000
 ```
 
@@ -248,15 +248,15 @@ Press `Ctrl+C` to stop the server.
 Create a systemd service file to keep the server running:
 
 ```bash
-sudo nano /etc/systemd/system/luanti-tracker.service
+sudo nano /etc/systemd/system/luanti-tracker-postgresql.service
 ```
 
 Add the following content:
 
 ```ini
 [Unit]
-Description=Luanti Player Position Tracker
-After=network.target mysql.service
+Description=Luanti Player Position Tracker (PostgreSQL)
+After=network.target postgresql.service
 
 [Service]
 Type=simple
@@ -264,7 +264,7 @@ User=your_username
 WorkingDirectory=/home/your_username/Position
 Environment="PATH=/home/your_username/Position/venv/bin"
 EnvironmentFile=/home/your_username/Position/.env
-ExecStart=/home/your_username/Position/venv/bin/python3 /home/your_username/Position/server.py
+ExecStart=/home/your_username/Position/venv/bin/python3 /home/your_username/Position/server_postgresql.py
 Restart=always
 RestartSec=10
 
@@ -279,15 +279,31 @@ Save and exit. Then enable and start the service:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable luanti-tracker
-sudo systemctl start luanti-tracker
+sudo systemctl enable luanti-tracker-postgresql
+sudo systemctl start luanti-tracker-postgresql
 ```
 
 Check the status:
 
 ```bash
-sudo systemctl status luanti-tracker
+sudo systemctl status luanti-tracker-postgresql
 ```
+
+You should see "active (running)" in green.
+
+### Step 8: Configure Firewall
+
+Allow traffic on port 5000:
+
+```bash
+sudo ufw allow 5000/tcp
+sudo ufw allow 30000/udp  # For Luanti game server
+sudo ufw enable
+```
+
+---
+
+## Luanti Server Installation
 
 ### Step 6.1: Install Luanti Server
 
@@ -313,6 +329,7 @@ git clone https://github.com/minetest/minetest_game.git ~/snap/luanti/common/.mi
 ```
 
 **For non-Snap users:**
+
 ```bash
 mkdir -p ~/.luanti/games
 git clone https://github.com/minetest/minetest_game.git ~/.luanti/games/minetest_game
@@ -321,6 +338,7 @@ git clone https://github.com/minetest/minetest_game.git ~/.luanti/games/minetest
 ### Step 6.3: Create a World
 
 **For Snap users:**
+
 ```bash
 mkdir -p ~/snap/luanti/common/.minetest/worlds/myworld
 echo "gameid = minetest_game" > ~/snap/luanti/common/.minetest/worlds/myworld/world.mt
@@ -328,6 +346,7 @@ echo "backend = sqlite3" >> ~/snap/luanti/common/.minetest/worlds/myworld/world.
 ```
 
 **For non-Snap users:**
+
 ```bash
 mkdir -p ~/.luanti/worlds/myworld
 echo "gameid = minetest_game" > ~/.luanti/worlds/myworld/world.mt
@@ -439,31 +458,29 @@ Download and install Luanti from: https://www.luanti.org/downloads/
 ### Step 1: Check Flask Server Logs
 
 ```bash
-sudo journalctl -u luanti-tracker -f
+sudo journalctl -u luanti-tracker-postgresql -f
 ```
 
 You should see log entries like:
 
 ```
-MySQL connection pool created successfully
+PostgreSQL connection pool created successfully
  * Running on http://0.0.0.0:5000
 ```
 
-When players move, you won't see individual position logs unless there's an error.
+### Step 2: Verify Data in PostgreSQL
 
-### Step 2: Verify Data in MySQL
-
-Connect to MySQL:
+Connect to PostgreSQL:
 
 ```bash
-mysql -u luanti -p luanti_db
+psql -U luanti -d luanti_db
 ```
 
 Query the player traces:
 
 ```sql
 -- Check if table exists
-SHOW TABLES;
+\dt
 
 -- View recent traces
 SELECT * FROM player_traces ORDER BY timestamp DESC LIMIT 10;
@@ -477,7 +494,7 @@ FROM player_traces
 GROUP BY player_name;
 
 -- Exit
-EXIT;
+\q
 ```
 
 You should see position data with timestamps for connected players.
@@ -497,7 +514,7 @@ Expected response: `{"status":"success"}`
 Then verify it was inserted:
 
 ```bash
-mysql -u luanti -p luanti_db -e "SELECT * FROM player_traces WHERE player_name='test_player';"
+psql -U luanti -d luanti_db -c "SELECT * FROM player_traces WHERE player_name='test_player';"
 ```
 
 ---
@@ -509,21 +526,21 @@ mysql -u luanti -p luanti_db -e "SELECT * FROM player_traces WHERE player_name='
 **Check service status:**
 
 ```bash
-sudo systemctl status luanti-tracker
+sudo systemctl status luanti-tracker-postgresql
 ```
 
 **View detailed logs:**
 
 ```bash
-sudo journalctl -u luanti-tracker -n 50
+sudo journalctl -u luanti-tracker-postgresql -n 50
 ```
 
 **Common issues:**
 
-1. **MySQL connection error**: Verify MySQL is running and credentials are correct
+1. **PostgreSQL connection error**: Verify PostgreSQL is running and credentials are correct
    ```bash
-   sudo systemctl status mysql
-   mysql -u luanti -p luanti_db
+   sudo systemctl status postgresql
+   psql -U luanti -d luanti_db
    ```
 
 2. **Port already in use**: Check if port 5000 is available
@@ -533,11 +550,19 @@ sudo journalctl -u luanti-tracker -n 50
 
 3. **Permission issues**: Ensure the service file has correct username and paths
 
+4. **Authentication failed**: Check PostgreSQL `pg_hba.conf` for authentication method
+   ```bash
+   sudo nano /etc/postgresql/*/main/pg_hba.conf
+   ```
+   
+   Ensure there's a line like:
+   ```
+   local   all             all                                     md5
+   ```
+
 ### Luanti Mod Not Sending Data
 
 **Check Luanti server logs:**
-
-Look for errors related to `position_tracker`:
 
 ```bash
 cat ~/.luanti/debug.txt | grep position_tracker
@@ -557,24 +582,24 @@ cat ~/.luanti/debug.txt | grep position_tracker
    - Check `world.mt` file
    - Restart Luanti server after enabling
 
-### No Data in MySQL
+### No Data in PostgreSQL
 
 **Verify database and table exist:**
 
 ```bash
-mysql -u luanti -p -e "USE luanti_db; SHOW TABLES;"
+psql -U luanti -d luanti_db -c "\dt"
 ```
 
 If table doesn't exist, re-import schema:
 
 ```bash
-mysql -u luanti -p luanti_db < schema.sql
+psql -U luanti -d luanti_db -f schema_postgresql.sql
 ```
 
 **Check Flask server logs for database errors:**
 
 ```bash
-sudo journalctl -u luanti-tracker -n 100 | grep -i error
+sudo journalctl -u luanti-tracker-postgresql -n 100 | grep -i error
 ```
 
 ### Connection Issues
@@ -599,16 +624,16 @@ Ensure port 5000 is allowed.
 
 ## Security Considerations
 
-### MySQL Security
+### PostgreSQL Security
 
 > [!CAUTION]
-> Never expose MySQL port 3306 to the internet unless absolutely necessary and properly secured.
+> Never expose PostgreSQL port 5432 to the internet unless absolutely necessary and properly secured.
 
-1. **Keep MySQL on localhost**: Default configuration binds to `127.0.0.1`
+1. **Keep PostgreSQL on localhost**: Default configuration binds to `127.0.0.1`
    
-   Verify:
+   Verify in `/etc/postgresql/*/main/postgresql.conf`:
    ```bash
-   sudo netrc | grep mysql
+   sudo grep listen_addresses /etc/postgresql/*/main/postgresql.conf
    ```
 
 2. **Use strong passwords**: For production deployments (development uses simple password)
@@ -617,7 +642,12 @@ Ensure port 5000 is allowed.
 
 4. **Regular backups**:
    ```bash
-   mysqldump -u luanti -p luanti_db > backup_$(date +%Y%m%d).sql
+   pg_dump -U luanti luanti_db > backup_$(date +%Y%m%d).sql
+   ```
+
+5. **Configure authentication**: Edit `pg_hba.conf` to restrict access
+   ```bash
+   sudo nano /etc/postgresql/*/main/pg_hba.conf
    ```
 
 ### Flask Server Security
@@ -645,7 +675,7 @@ Ensure port 5000 is allowed.
 
 1. **Change default port**: Edit `minetest.conf` to use a non-standard port
 
-2. **Whitelist trusted mods**: Only add necessary mods to `secure.http_mods``
+2. **Whitelist trusted mods**: Only add necessary mods to `secure.http_mods`
 
 3. **Monitor logs**: Regularly check for suspicious activity
 
@@ -666,75 +696,38 @@ sudo ufw enable
 
 ---
 
-## Advanced Configuration
+## Advantages of PostgreSQL
 
-### Auto-start on Boot
+### Why Choose PostgreSQL?
 
-Both services are configured to start automatically:
+1. **Advanced Features**: 
+   - Better support for complex queries
+   - Native JSON/JSONB support
+   - Advanced indexing options (GiST, GIN)
 
-```bash
-# Check Flask server
-sudo systemctl is-enabled luanti-tracker
+2. **Data Integrity**:
+   - Strong ACID compliance
+   - Robust transaction support
+   - Better handling of concurrent connections
 
-# Check MySQL
-sudo systemctl is-enabled mysql
-```
+3. **Scalability**:
+   - Excellent performance with large datasets
+   - Better support for read replicas
+   - Advanced partitioning capabilities
 
-### Monitoring and Logging
+4. **Timezone Support**:
+   - `TIMESTAMP WITH TIME ZONE` natively stores timezone information
+   - Better for distributed systems across multiple timezones
 
-**Set up log rotation for Flask server:**
+### PostgreSQL vs MySQL for This Project
 
-```bash
-sudo nano /etc/logrotate.d/luanti-tracker
-```
-
-Add:
-
-```
-/var/log/luanti-tracker.log {
-    daily
-    rotate 7
-    compress
-    missingok
-    notifempty
-}
-```
-
-**Monitor server resources:**
-
-```bash
-# CPU and memory usage
-top
-
-# Disk usage
-df -h
-
-# MySQL processes
-mysqladmin -u root -p processlist
-```
-
-### Database Optimization
-
-For large datasets, consider:
-
-1. **Archiving old data**:
-   ```sql
-   -- Create archive table
-   CREATE TABLE player_traces_archive LIKE player_traces;
-   
-   -- Move old data
-   INSERT INTO player_traces_archive 
-   SELECT * FROM player_traces 
-   WHERE timestamp < DATE_SUB(NOW(), INTERVAL 30 DAY);
-   
-   -- Delete archived data from main table
-   DELETE FROM player_traces 
-   WHERE timestamp < DATE_SUB(NOW(), INTERVAL 30 DAY);
-   ```
-
-2. **Add additional indexes** for common queries
-
-3. **Partition tables** by date for better performance
+| Feature | PostgreSQL | MySQL |
+|---------|-----------|-------|
+| **Data Type** | TIMESTAMP WITH TIME ZONE | DATETIME (no timezone) |
+| **Auto-increment** | SERIAL | AUTO_INCREMENT |
+| **Default Port** | 5432 | 3306 |
+| **Precision** | DOUBLE PRECISION | DOUBLE |
+| **Timezone Handling** | Native | Manual conversion needed |
 
 ---
 
@@ -742,12 +735,24 @@ For large datasets, consider:
 
 You now have a fully functional Luanti Player Position Tracker system with:
 
-✅ MySQL database for persistent storage  
+✅ PostgreSQL database for persistent storage  
 ✅ Python Flask middleware for data processing  
 ✅ Luanti mod for position tracking  
 ✅ Systemd service for automatic startup  
 ✅ Security best practices implemented  
+✅ Timezone-aware timestamp storage  
 
 The system will automatically track and store player positions from your Luanti server. You can query the database at any time to analyze player movement patterns.
 
 For questions or issues, review the [Troubleshooting](#troubleshooting) section or check the service logs.
+
+---
+
+## Additional Resources
+
+- **PostgreSQL Documentation**: https://www.postgresql.org/docs/
+- **psycopg2 Documentation**: https://www.psycopg.org/docs/
+- **Luanti Official Site**: https://www.luanti.org/
+- **Flask Documentation**: https://flask.palletsprojects.com/
+
+For MySQL version, see [SETUP_GUIDE.md](SETUP_GUIDE.md).

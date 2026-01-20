@@ -1,0 +1,240 @@
+#!/bin/bash
+
+# Luanti Position Tracker - Automated PostgreSQL Setup Script
+# This script automates the entire server setup process for PostgreSQL
+
+set -e  # Exit on any error
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Function to print colored output
+print_info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+# Check if running as root
+if [ "$EUID" -eq 0 ]; then 
+   print_error "Please do not run this script as root. Run as a regular user with sudo privileges."
+   exit 1
+fi
+
+# Configuration
+DB_NAME="luanti_db"
+DB_USER="luanti"
+DB_PASS="postgres123"
+PROJECT_DIR="$HOME/Position"
+PYTHON_VERSION="python3"
+
+print_info "=== Luanti Position Tracker - PostgreSQL Setup ==="
+echo ""
+print_warning "This script will:"
+echo "  1. Update system packages"
+echo "  2. Install PostgreSQL, Python, and dependencies"
+echo "  3. Configure PostgreSQL database"
+echo "  4. Set up Python Flask server"
+echo "  5. Install Luanti server and game content"
+echo "  6. Configure systemd service"
+echo "  7. Set up firewall"
+echo ""
+read -p "Do you want to continue? (y/n) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    print_info "Setup cancelled."
+    exit 0
+fi
+
+# Step 1: Update system
+print_info "Step 1/9: Updating system packages..."
+sudo apt update
+sudo apt upgrade -y
+
+# Step 2: Install required packages
+print_info "Step 2/9: Installing PostgreSQL, Python, Git, and Snap..."
+sudo apt install -y postgresql postgresql-contrib python3 python3-pip python3-venv git snapd
+
+# Step 3: Install Luanti via Snap
+print_info "Step 3/9: Installing Luanti via Snap..."
+sudo snap install luanti
+
+# Step 4: Configure PostgreSQL
+print_info "Step 4/9: Configuring PostgreSQL..."
+
+# Create database and user
+print_info "Creating database and user..."
+sudo -u postgres psql <<EOF
+CREATE DATABASE ${DB_NAME};
+CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';
+GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};
+\c ${DB_NAME}
+GRANT ALL ON SCHEMA public TO ${DB_USER};
+EOF
+
+print_info "PostgreSQL configuration complete!"
+
+# Step 5: Set up Python application
+print_info "Step 5/9: Setting up Python application..."
+
+if [ ! -d "$PROJECT_DIR" ]; then
+    print_error "Project directory $PROJECT_DIR not found!"
+    print_info "Please upload your Position folder to $PROJECT_DIR and run this script again."
+    exit 1
+fi
+
+cd "$PROJECT_DIR"
+
+# Create virtual environment
+print_info "Creating Python virtual environment..."
+$PYTHON_VERSION -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+print_info "Installing Python dependencies..."
+pip install --upgrade pip
+pip install -r requirements_postgresql.txt
+
+# Create .env file
+print_info "Creating .env configuration file..."
+cat > .env <<EOF
+DB_HOST=localhost
+DB_NAME=${DB_NAME}
+DB_USER=${DB_USER}
+DB_PASS=${DB_PASS}
+DB_PORT=5432
+EOF
+
+# Import database schema
+print_info "Importing database schema..."
+PGPASSWORD=${DB_PASS} psql -U ${DB_USER} -d ${DB_NAME} -f schema_postgresql.sql
+
+print_info "Python application setup complete!"
+
+# Step 6: Install Luanti game content
+print_info "Step 6/9: Installing Luanti game content..."
+
+# Create directories
+mkdir -p ~/snap/luanti/common/.minetest/games
+mkdir -p ~/snap/luanti/common/.minetest/worlds/myworld
+mkdir -p ~/snap/luanti/common/.minetest/mods
+
+# Clone Minetest Game
+if [ ! -d ~/snap/luanti/common/.minetest/games/minetest_game ]; then
+    print_info "Downloading Minetest Game..."
+    git clone https://github.com/minetest/minetest_game.git ~/snap/luanti/common/.minetest/games/minetest_game
+else
+    print_info "Minetest Game already exists, skipping..."
+fi
+
+# Create world configuration
+print_info "Creating world configuration..."
+echo "gameid = minetest_game" > ~/snap/luanti/common/.minetest/worlds/myworld/world.mt
+echo "backend = sqlite3" >> ~/snap/luanti/common/.minetest/worlds/myworld/world.mt
+echo "load_mod_position_tracker = true" >> ~/snap/luanti/common/.minetest/worlds/myworld/world.mt
+
+# Copy mod
+print_info "Installing position tracker mod..."
+cp -r "$PROJECT_DIR/mod" ~/snap/luanti/common/.minetest/mods/position_tracker
+
+# Configure mod
+print_info "Configuring mod..."
+sed -i 's|local SERVER_URL = .*|local SERVER_URL = "http://localhost:5000/position"|' ~/snap/luanti/common/.minetest/mods/position_tracker/init.lua
+
+# Create minetest.conf
+echo "secure.http_mods = position_tracker" > ~/snap/luanti/common/.minetest/minetest.conf
+
+print_info "Luanti setup complete!"
+
+# Step 7: Create systemd service
+print_info "Step 7/9: Creating systemd service..."
+
+sudo tee /etc/systemd/system/luanti-tracker-postgresql.service > /dev/null <<EOF
+[Unit]
+Description=Luanti Player Position Tracker (PostgreSQL)
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=$(whoami)
+WorkingDirectory=$PROJECT_DIR
+Environment="PATH=$PROJECT_DIR/venv/bin"
+EnvironmentFile=$PROJECT_DIR/.env
+ExecStart=$PROJECT_DIR/venv/bin/python3 $PROJECT_DIR/server_postgresql.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start service
+sudo systemctl daemon-reload
+sudo systemctl enable luanti-tracker-postgresql
+sudo systemctl start luanti-tracker-postgresql
+
+print_info "Systemd service created and started!"
+
+# Step 8: Configure firewall
+print_info "Step 8/9: Configuring firewall..."
+sudo ufw allow OpenSSH
+sudo ufw allow 5000/tcp
+sudo ufw allow 30000/udp
+sudo ufw --force enable
+
+print_info "Firewall configured!"
+
+# Step 9: Create Luanti server start script
+print_info "Step 9/9: Creating Luanti server start script..."
+
+cat > ~/start-luanti-server.sh <<'EOF'
+#!/bin/bash
+/snap/bin/luanti --server --world ~/snap/luanti/common/.minetest/worlds/myworld --gameid minetest_game --port 30000
+EOF
+
+chmod +x ~/start-luanti-server.sh
+
+print_info "Luanti server start script created!"
+
+# Final status check
+echo ""
+print_info "=== Setup Complete! ==="
+echo ""
+print_info "Checking service status..."
+sudo systemctl status luanti-tracker-postgresql --no-pager | head -n 10
+
+echo ""
+print_info "=== Next Steps ==="
+echo ""
+echo "1. Test the Flask server:"
+echo "   curl http://localhost:5000/"
+echo ""
+echo "2. Test position logging:"
+echo "   curl -X POST http://localhost:5000/position \\"
+echo "     -H \"Content-Type: application/json\" \\"
+echo "     -d '{\"player\":\"test\",\"pos\":{\"x\":1,\"y\":2,\"z\":3}}'"
+echo ""
+echo "3. Verify data in PostgreSQL:"
+echo "   PGPASSWORD=${DB_PASS} psql -U ${DB_USER} -d ${DB_NAME} -c \"SELECT * FROM player_traces;\""
+echo ""
+echo "4. Start Luanti server:"
+echo "   ~/start-luanti-server.sh"
+echo ""
+echo "5. Connect from your Luanti client to:"
+echo "   Server IP: $(hostname -I | awk '{print $1}')"
+echo "   Port: 30000"
+echo ""
+print_info "Configuration details saved in: $PROJECT_DIR/.env"
+print_info "PostgreSQL User: ${DB_USER}"
+print_info "PostgreSQL Password: ${DB_PASS}"
+echo ""
+print_warning "For security, consider changing these passwords in production!"

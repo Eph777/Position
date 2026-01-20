@@ -1,6 +1,11 @@
 # Luanti Player Position Tracker
 
-A system for tracking and storing player positions from a Luanti (formerly Minetest) game server using MySQL database.
+A system for tracking and storing player positions from a Luanti (formerly Minetest) game server using **MySQL** or **PostgreSQL** database.
+
+> [!NOTE]
+> This project supports both **MySQL** and **PostgreSQL**. Choose the database that best fits your needs:
+> - **MySQL**: [SETUP_GUIDE.md](SETUP_GUIDE.md) - Simpler setup, widely available
+> - **PostgreSQL**: [SETUP_GUIDE_POSTGRESQL.md](SETUP_GUIDE_POSTGRESQL.md) - Advanced features, better timezone handling
 
 ## System Architecture
 
@@ -57,14 +62,18 @@ The system consists of three components:
 
 5. **Configure environment variables**:
    ```bash
-   cp .env.example .env
-   nano .env  # Update with your MySQL credentials
+   cp .env.example .env  # For MySQL
+   # OR
+   cp .env.example.postgresql .env  # For PostgreSQL
+   nano .env  # Update with your credentials
    ```
 
 6. **Run the Flask server**:
    ```bash
    export $(cat .env | xargs)
-   python3 server.py
+   python3 server.py  # For MySQL
+   # OR
+   python3 server_postgresql.py  # For PostgreSQL
    ```
 
 ### Luanti Mod Installation
@@ -91,9 +100,12 @@ The system consists of three components:
 
 ## Documentation
 
-- **[SETUP_GUIDE.md](SETUP_GUIDE.md)**: Comprehensive server setup guide with step-by-step instructions for remote deployment
+- **[SETUP_GUIDE.md](SETUP_GUIDE.md)**: MySQL setup guide with step-by-step instructions for remote deployment
+- **[SETUP_GUIDE_POSTGRESQL.md](SETUP_GUIDE_POSTGRESQL.md)**: PostgreSQL setup guide with step-by-step instructions  
 - **[schema.sql](schema.sql)**: MySQL database schema
-- **[.env.example](.env.example)**: Environment variable template
+- **[schema_postgresql.sql](schema_postgresql.sql)**: PostgreSQL database schema
+- **[.env.example](.env.example)**: MySQL environment variable template
+- **[.env.example.postgresql](.env.example.postgresql)**: PostgreSQL environment variable template
 
 ## Usage
 
