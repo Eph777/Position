@@ -17,10 +17,20 @@ echo -e "${GREEN}[INFO] Setting up real-time map services...${NC}"
 
 # 1. Install Dependencies
 echo "Installing dependencies..."
-sudo apt update
-sudo apt install -y python3-pip
-# Install the standard RangeHTTPServer package which is fully compatible with QGIS
-sudo pip3 install range-httpserver
+# We use the existing virtual environment created by the main setup script
+if [ ! -f "$PROJECT_DIR/venv/bin/pip" ]; then
+    echo -e "${RED}[ERROR] Virtual environment not found at $PROJECT_DIR/venv${NC}"
+    echo "Please run setup_postgresql.sh first!"
+    exit 1
+fi
+
+echo "Installing range-httpserver into virtual environment..."
+# Running as the owner of the venv (usually the user) to avoid permission issues
+if [ ! -z "$SUDO_USER" ]; then
+    sudo -u $SUDO_USER $PROJECT_DIR/venv/bin/pip install range-httpserver
+else
+    $PROJECT_DIR/venv/bin/pip install range-httpserver
+fi
 
 # 2. Create the Render Loop Script
 cat > "$PROJECT_DIR/auto_render_loop.sh" <<EOF
@@ -63,8 +73,8 @@ After=network.target
 Type=simple
 User=$(whoami)
 WorkingDirectory=$MAP_OUTPUT_DIR
-# Use the robust RangeHTTPServer module
-ExecStart=/usr/bin/python3 -m RangeHTTPServer 8080
+# Use the robust RangeHTTPServer module from the venv
+ExecStart=$PROJECT_DIR/venv/bin/python3 -m RangeHTTPServer 8080
 Restart=always
 
 [Install]
