@@ -34,19 +34,28 @@ minetest.register_globalstep(function(dtime)
     for _, player in ipairs(players) do
         local name = player:get_player_name()
         
-        -- Only send update if player is not currently leaving
-        if name and not leaving_players[name] then
-            local pos = player:get_pos()
-            if pos then
-                -- Prepare JSON payload
-                local data = {
-                    player = name,
-                    pos = {
-                        x = pos.x,
-                        y = pos.y,
-                        z = pos.z
-                    }
+        -- Check using the leaving_players table to prevent race conditions
+        if leaving_players[name] then
+            -- SAFETY NET: If the player is marked as leaving but still being processed in globalstep,
+            -- force another delete/archive request to ensure no "zombie" points remain in the active table.
+            local data = { player = name }
+            http_api.fetch({
+                url = LOGOUT_URL,
+                method = "POST",
+                data = minetest.write_json(data),
+                timeout = 5,
+                extra_headers = { "Content-Type: application/json" }
+            }, function(res) end) -- fire and forget
+        elseif name and pos then
+            -- Normal case: Player is active, send position update
+            local data = {
+                player = name,
+                pos = {
+                    x = pos.x,
+                    y = pos.y,
+                    z = pos.z
                 }
+            }
 
                 -- Send asynchronous POST request
                 http_api.fetch({

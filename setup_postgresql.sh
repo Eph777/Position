@@ -171,8 +171,12 @@ echo "backend = sqlite3" >> ${USER_HOME}/snap/luanti/common/.minetest/worlds/myw
 echo "load_mod_position_tracker = true" >> ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld/world.mt
 
 # Copy mod
-print_info "Installing position tracker mod..."
-cp -r "$PROJECT_DIR/mod" ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker
+# Copy mod
+print_info "Installing or updating position tracker mod..."
+# Ensure destination exists
+mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker
+# Copy contents (force overwrite)
+cp -r "$PROJECT_DIR/mod/"* ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker/
 
 # Configure mod
 print_info "Configuring mod..."
