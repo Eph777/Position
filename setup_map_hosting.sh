@@ -15,22 +15,8 @@ NC='\033[0m'
 
 echo -e "${GREEN}[INFO] Setting up real-time map services...${NC}"
 
-# 1. Install Dependencies
-echo "Installing dependencies..."
-# We use the existing virtual environment created by the main setup script
-if [ ! -f "$PROJECT_DIR/venv/bin/pip" ]; then
-    echo -e "${RED}[ERROR] Virtual environment not found at $PROJECT_DIR/venv${NC}"
-    echo "Please run setup_postgresql.sh first!"
-    exit 1
-fi
-
-echo "Installing range-httpserver into virtual environment..."
-# Running as the owner of the venv (usually the user) to avoid permission issues
-if [ ! -z "$SUDO_USER" ]; then
-    sudo -u $SUDO_USER $PROJECT_DIR/venv/bin/pip install range-httpserver
-else
-    $PROJECT_DIR/venv/bin/pip install range-httpserver
-fi
+# 1. Start setup
+echo "Configuring map services..."
 
 # 2. Create the Render Loop Script
 cat > "$PROJECT_DIR/auto_render_loop.sh" <<EOF
@@ -73,8 +59,8 @@ After=network.target
 Type=simple
 User=$(whoami)
 WorkingDirectory=$MAP_OUTPUT_DIR
-# Use the robust RangeHTTPServer module from the venv
-ExecStart=$PROJECT_DIR/venv/bin/python3 -m RangeHTTPServer 8080
+# Use our custom Python script that supports Range requests (No external dependencies needed!)
+ExecStart=/usr/bin/python3 $PROJECT_DIR/range_server.py 8080
 Restart=always
 
 [Install]
