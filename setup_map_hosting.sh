@@ -15,7 +15,14 @@ NC='\033[0m'
 
 echo -e "${GREEN}[INFO] Setting up real-time map services...${NC}"
 
-# 1. Create the Render Loop Script
+# 1. Install Dependencies
+echo "Installing dependencies..."
+sudo apt update
+sudo apt install -y python3-pip
+# Install the standard RangeHTTPServer package which is fully compatible with QGIS
+sudo pip3 install range-httpserver
+
+# 2. Create the Render Loop Script
 cat > "$PROJECT_DIR/auto_render_loop.sh" <<EOF
 #!/bin/bash
 while true; do
@@ -27,7 +34,7 @@ done
 EOF
 chmod +x "$PROJECT_DIR/auto_render_loop.sh"
 
-# 2. Create Map Renderer Service
+# 3. Create Map Renderer Service
 echo "Creating luanti-map-render.service..."
 sudo tee /etc/systemd/system/luanti-map-render.service > /dev/null <<EOF
 [Unit]
@@ -45,7 +52,7 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
-# 3. Create HTTP Map Server Service
+# 4. Create HTTP Map Server Service
 echo "Creating luanti-map-server.service..."
 sudo tee /etc/systemd/system/luanti-map-server.service > /dev/null <<EOF
 [Unit]
@@ -56,8 +63,8 @@ After=network.target
 Type=simple
 User=$(whoami)
 WorkingDirectory=$MAP_OUTPUT_DIR
-# Use our custom range_server.py for QGIS compatibility
-ExecStart=/usr/bin/python3 $PROJECT_DIR/range_server.py 8080
+# Use the robust RangeHTTPServer module
+ExecStart=/usr/bin/python3 -m RangeHTTPServer 8080
 Restart=always
 
 [Install]
