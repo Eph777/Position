@@ -66,7 +66,7 @@ sudo apt upgrade -y
 
 # Step 2: Install required packages
 print_info "Step 2/9: Installing PostgreSQL, PostGIS, Python, Git, and Snap..."
-sudo apt install -y postgresql postgresql-contrib postgis python3 python3-pip python3-venv git snapd
+sudo apt install -y postgresql postgresql-contrib postgis python3 python3-pip python3-venv git snapd lsof
 
 # Step 3: Install Luanti via Snap
 print_info "Step 3/9: Installing Luanti via Snap..."
@@ -203,7 +203,7 @@ print_info "Luanti setup complete!"
 print_info "Step 7/9: Checking for port conflicts..."
 
 # Check if port 5000 is in use
-PORT_IN_USE=$(sudo lsof -i :5000 -t 2>/dev/null)
+PORT_IN_USE=$(sudo lsof -i :5000 -t 2>/dev/null || true)
 
 if [ ! -z "$PORT_IN_USE" ]; then
     print_warning "Port 5000 is already in use!"
