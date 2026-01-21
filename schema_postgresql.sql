@@ -30,5 +30,5 @@ SELECT DISTINCT ON (player_name)
     id, player_name, x, y, z, timestamp,
     ST_SetSRID(ST_MakePoint(x, z), 0) AS geom
 FROM player_traces
-WHERE timestamp > NOW() - INTERVAL '30 seconds'
+WHERE timestamp > NOW() - INTERVAL '1 seconds'
 ORDER BY player_name, timestamp DESC;

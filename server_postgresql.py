@@ -91,7 +91,8 @@ def log_position():
         if conn:
             conn.rollback()
         print(f"Error saving trace: {error}")
-        return jsonify({"error": "Database error"}), 500
+        return jsonify({"error": str(error)}), 500
+    finally:
         if conn:
             postgresql_pool.putconn(conn)
 
