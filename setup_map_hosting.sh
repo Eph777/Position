@@ -56,8 +56,8 @@ After=network.target
 Type=simple
 User=$(whoami)
 WorkingDirectory=$MAP_OUTPUT_DIR
-# Python's http.server is simple and efficient for this
-ExecStart=/usr/bin/python3 -m http.server 8080
+# Use our custom range_server.py for QGIS compatibility
+ExecStart=/usr/bin/python3 $PROJECT_DIR/range_server.py 8080
 Restart=always
 
 [Install]
