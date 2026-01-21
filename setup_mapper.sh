@@ -72,5 +72,5 @@ if [ ! -f "$MAPPER_DIR/colors.txt" ]; then
     wget https://raw.githubusercontent.com/luanti-org/minetestmapper/master/colors.txt -O "$MAPPER_DIR/colors.txt"
 fi
 
-print_info "Setup complete! executable is located at: $MAPPER_DIR/minetest_mapper"
+print_info "Setup complete! executable is located at: $MAPPER_DIR/minetestmapper"
 print_info "You can now run ./render_map.sh to generate your map."
