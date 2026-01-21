@@ -4,24 +4,6 @@ This directory contains automated setup scripts to simplify the deployment proce
 
 ## Available Scripts
 
-### MySQL Setup
-```bash
-chmod +x setup_mysql.sh
-./setup_mysql.sh
-```
-
-**What it does:**
-- Updates system packages
-- Installs MySQL, Python, Git, and Snap
-- Configures MySQL database with user `luanti` and password `luanti123`
-- Sets up Python virtual environment and installs dependencies
-- Installs Luanti server via Snap
-- Downloads Minetest Game content
-- Configures and installs the position tracker mod
-- Creates and starts systemd service
-- Configures firewall rules
-- Creates Luanti server start script
-
 ### PostgreSQL Setup
 ```bash
 chmod +x setup_postgresql.sh
@@ -65,11 +47,6 @@ chmod +x setup_postgresql.sh
 
 4. Make the script executable and run it:
    ```bash
-   # For MySQL
-   chmod +x setup_mysql.sh
-   ./setup_mysql.sh
-   
-   # OR for PostgreSQL
    chmod +x setup_postgresql.sh
    ./setup_postgresql.sh
    ```
@@ -94,12 +71,6 @@ Once the script completes:
 
 3. **Verify database:**
    
-   For MySQL:
-   ```bash
-   mysql -u luanti -pluanti123 luanti_db -e "SELECT * FROM player_traces;"
-   ```
-   
-   For PostgreSQL:
    ```bash
    PGPASSWORD=postgres123 psql -U luanti -d luanti_db -c "SELECT * FROM player_traces;"
    ```
@@ -112,12 +83,6 @@ Once the script completes:
 5. **Connect from your Luanti client** using your server's IP address and port 30000
 
 ## Default Credentials
-
-### MySQL
-- Database: `luanti_db`
-- User: `luanti`
-- Password: `luanti123`
-- Root Password: `mysql_root_123`
 
 ### PostgreSQL
 - Database: `luanti_db`
@@ -136,10 +101,6 @@ If the script fails:
 3. **Verify the Position folder is in ~/Position**
 4. **Check system logs:**
    ```bash
-   # For MySQL
-   sudo journalctl -u luanti-tracker -n 50
-   
-   # For PostgreSQL
    sudo journalctl -u luanti-tracker-postgresql -n 50
    ```
 

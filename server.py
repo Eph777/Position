@@ -1,33 +1,32 @@
 import os
 import datetime
 from flask import Flask, request, jsonify
-import mysql.connector
-from mysql.connector import pooling, Error
+import psycopg2
+from psycopg2 import pool
 
 app = Flask(__name__)
 
 # Database configuration - Update these with your actual credentials
 DB_HOST = os.environ.get("DB_HOST", "localhost")
 DB_NAME = os.environ.get("DB_NAME", "luanti_db")
-DB_USER = os.environ.get("DB_USER", "luanti")
+DB_USER = os.environ.get("DB_USER", "postgres")
 DB_PASS = os.environ.get("DB_PASS", "password")
-DB_PORT = int(os.environ.get("DB_PORT", "3306"))
+DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 
 # Initialize connection pool
 try:
-    mysql_pool = mysql.connector.pooling.MySQLConnectionPool(
-        pool_name="luanti_pool",
-        pool_size=20,
-        pool_reset_session=True,
+    postgresql_pool = psycopg2.pool.SimpleConnectionPool(
+        1, 20,
         host=DB_HOST,
         database=DB_NAME,
         user=DB_USER,
         password=DB_PASS,
         port=DB_PORT
     )
-    print("MySQL connection pool created successfully")
-except Error as error:
-    print(f"Error while connecting to MySQL: {error}")
+    if postgresql_pool:
+        print("PostgreSQL connection pool created successfully")
+except (Exception, psycopg2.DatabaseError) as error:
+    print(f"Error while connecting to PostgreSQL: {error}")
 
 @app.route('/position', methods=['POST'])
 def log_position():
@@ -48,7 +47,7 @@ def log_position():
     # Insert into database
     conn = None
     try:
-        conn = mysql_pool.get_connection()
+        conn = postgresql_pool.getconn()
         cursor = conn.cursor()
         query = """
             INSERT INTO player_traces (player_name, x, y, z)
@@ -56,16 +55,93 @@ def log_position():
         """
         cursor.execute(query, (player, x, y, z))
         conn.commit()
+        
+        # 3. Success response immediately (don't let cleanup block this)
+        response = jsonify({"status": "success"})
+        status_code = 201
+        
+        # 4. Cleanup (Best Effort)
+        try:
+            # We use a new cursor check for cleanup to isolate it
+            cursor.close()
+            cursor = conn.cursor()
+            
+            # Lazy Cleanup: Archive "stale" records (older than 60s)
+            cleanup_query = """
+                WITH moved_rows AS (
+                    INSERT INTO player_traces_archive (player_name, x, y, z, timestamp)
+                    SELECT player_name, x, y, z, timestamp
+                    FROM player_traces
+                    WHERE timestamp < NOW() - INTERVAL '60 seconds'
+                    RETURNING player_name
+                )
+                DELETE FROM player_traces
+                WHERE timestamp < NOW() - INTERVAL '60 seconds';
+            """
+            cursor.execute(cleanup_query)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            print(f"Warning: Cleanup failed (non-critical): {e}")
+
         cursor.close()
-        return jsonify({"status": "success"}), 201
-    except Error as error:
+        return response, status_code
+
+    except (Exception, psycopg2.DatabaseError) as error:
         if conn:
             conn.rollback()
         print(f"Error saving trace: {error}")
+        return jsonify({"error": str(error)}), 500
+    finally:
+        if conn:
+            postgresql_pool.putconn(conn)
+
+@app.route('/logout', methods=['POST'])
+def logout_player():
+    """
+    Archives player traces when they leave the game.
+    Moves data from player_traces -> player_traces_archive
+    """
+    data = request.json
+    if not data or 'player' not in data:
+        return jsonify({"error": "Invalid data format"}), 400
+
+    player = data['player']
+    
+    conn = None
+    try:
+        conn = postgresql_pool.getconn()
+        cursor = conn.cursor()
+        
+        # 1. Copy to archive
+        archive_query = """
+            INSERT INTO player_traces_archive (player_name, x, y, z, timestamp)
+            SELECT player_name, x, y, z, timestamp
+            FROM player_traces
+            WHERE player_name = %s
+        """
+        cursor.execute(archive_query, (player,))
+        
+        # 2. Delete from active
+        delete_query = """
+            DELETE FROM player_traces
+            WHERE player_name = %s
+        """
+        cursor.execute(delete_query, (player,))
+        
+        conn.commit()
+        cursor.close()
+        print(f"Archived session for player: {player}")
+        return jsonify({"status": "archived"}), 200
+        
+    except (Exception, psycopg2.DatabaseError) as error:
+        if conn:
+            conn.rollback()
+        print(f"Error archiving trace: {error}")
         return jsonify({"error": "Database error"}), 500
     finally:
-        if conn and conn.is_connected():
-            conn.close()
+        if conn:
+            postgresql_pool.putconn(conn)
 
 @app.route('/traces', methods=['GET'])
 def get_traces():
@@ -80,13 +156,7 @@ def get_traces():
     
     conn = None
     try:
-        conn = mysql.connector.connect(
-            host=DB_HOST,
-            database=DB_NAME,
-            user=DB_USER,
-            password=DB_PASS,
-            port=DB_PORT
-        )
+        conn = postgresql_pool.getconn()
         cursor = conn.cursor()
         
         if player_name:
@@ -123,12 +193,12 @@ def get_traces():
             })
         
         return jsonify({"count": len(traces), "traces": traces}), 200
-    except Error as error:
+    except (Exception, psycopg2.DatabaseError) as error:
         print(f"Error retrieving traces: {error}")
         return jsonify({"error": "Database error"}), 500
     finally:
-        if conn and conn.is_connected():
-            conn.close()
+        if conn:
+            postgresql_pool.putconn(conn)
 
 @app.route('/', methods=['GET'])
 def health_check():

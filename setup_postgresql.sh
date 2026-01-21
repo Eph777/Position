@@ -142,7 +142,7 @@ source venv/bin/activate
 # Install dependencies
 print_info "Installing Python dependencies..."
 pip install --upgrade pip
-pip install -r requirements_postgresql.txt
+pip install -r requirements.txt
 
 # Create .env file
 print_info "Creating .env configuration file..."
@@ -156,7 +156,7 @@ EOF
 
 # Import database schema
 print_info "Importing database schema..."
-PGPASSWORD=${DB_PASS} psql -U ${DB_USER} -d ${DB_NAME} -f schema_postgresql.sql
+PGPASSWORD=${DB_PASS} psql -U ${DB_USER} -d ${DB_NAME} -f schema.sql
 
 print_info "Python application setup complete!"
 
@@ -258,7 +258,7 @@ User=${CURRENT_USER}
 WorkingDirectory=$PROJECT_DIR
 Environment="PATH=$PROJECT_DIR/venv/bin"
 EnvironmentFile=$PROJECT_DIR/.env
-ExecStart=$PROJECT_DIR/venv/bin/python3 $PROJECT_DIR/server_postgresql.py
+ExecStart=$PROJECT_DIR/venv/bin/python3 $PROJECT_DIR/server.py
 Restart=always
 RestartSec=10
 
