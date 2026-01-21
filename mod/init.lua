@@ -1,6 +1,9 @@
 -- Configuration
--- The URL of the middleware server (Flask app)
-local SERVER_URL = "http://localhost:5000/position"
+-- The Base URL of the middleware server (Flask app)
+local SERVER_BASE_URL = "http://localhost:5000"
+local POSITION_URL = SERVER_BASE_URL .. "/position"
+local LOGOUT_URL = SERVER_BASE_URL .. "/logout"
+
 -- How often to send updates (in seconds)
 local UPDATE_INTERVAL = 1.0
 
@@ -38,7 +41,7 @@ minetest.register_globalstep(function(dtime)
 
             -- Send asynchronous POST request
             http_api.fetch({
-                url = SERVER_URL,
+                url = POSITION_URL,
                 method = "POST",
                 data = minetest.write_json(data),
                 timeout = 5,
@@ -52,6 +55,36 @@ minetest.register_globalstep(function(dtime)
             end)
         end
     end
+end)
+
+-- Trigger archiving when player leaves
+minetest.register_on_leaveplayer(function(player)
+    if not http_api then return end
+    
+    local name = player:get_player_name()
+    if not name then return end
+    
+    minetest.log("action", "[position_tracker] Player " .. name .. " left, archiving traces...")
+    
+    local data = {
+        player = name
+    }
+    
+    http_api.fetch({
+        url = LOGOUT_URL,
+        method = "POST",
+        data = minetest.write_json(data),
+        timeout = 5,
+        extra_headers = {
+            "Content-Type: application/json"
+        }
+    }, function(res)
+        if res.code ~= 200 then
+             minetest.log("warning", "[position_tracker] Failed to archive for " .. name .. ": " .. (res.code or "unknown"))
+        else
+             minetest.log("action", "[position_tracker] Successfully archived traces for " .. name)
+        end
+    end)
 end)
 
 minetest.log("action", "[position_tracker] Mod loaded and ready to track positions.")

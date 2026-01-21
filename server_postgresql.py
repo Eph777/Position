@@ -62,6 +62,52 @@ def log_position():
             conn.rollback()
         print(f"Error saving trace: {error}")
         return jsonify({"error": "Database error"}), 500
+        if conn:
+            postgresql_pool.putconn(conn)
+
+@app.route('/logout', methods=['POST'])
+def logout_player():
+    """
+    Archives player traces when they leave the game.
+    Moves data from player_traces -> player_traces_archive
+    """
+    data = request.json
+    if not data or 'player' not in data:
+        return jsonify({"error": "Invalid data format"}), 400
+
+    player = data['player']
+    
+    conn = None
+    try:
+        conn = postgresql_pool.getconn()
+        cursor = conn.cursor()
+        
+        # 1. Copy to archive
+        archive_query = """
+            INSERT INTO player_traces_archive (player_name, x, y, z, timestamp)
+            SELECT player_name, x, y, z, timestamp
+            FROM player_traces
+            WHERE player_name = %s
+        """
+        cursor.execute(archive_query, (player,))
+        
+        # 2. Delete from active
+        delete_query = """
+            DELETE FROM player_traces
+            WHERE player_name = %s
+        """
+        cursor.execute(delete_query, (player,))
+        
+        conn.commit()
+        cursor.close()
+        print(f"Archived session for player: {player}")
+        return jsonify({"status": "archived"}), 200
+        
+    except (Exception, psycopg2.DatabaseError) as error:
+        if conn:
+            conn.rollback()
+        print(f"Error archiving trace: {error}")
+        return jsonify({"error": "Database error"}), 500
     finally:
         if conn:
             postgresql_pool.putconn(conn)
