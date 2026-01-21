@@ -21,5 +21,13 @@ CREATE TABLE IF NOT EXISTS player_traces_archive (
 );
 
 -- Index on player_name and timestamp for faster querying of traces for specific players
-CREATE INDEX IF NOT EXISTS idx_player_traces_name_time ON player_traces(player_name, timestamp);
 CREATE INDEX IF NOT EXISTS idx_player_traces_archive_name_time ON player_traces_archive(player_name, timestamp);
+
+-- Create optimized view for QGIS live tracking (latest position per player)
+-- This view allows QGIS to see the latest position of each active player as a spatial layer
+CREATE OR REPLACE VIEW view_live_positions AS
+SELECT DISTINCT ON (player_name) 
+    id, player_name, x, y, z, timestamp,
+    ST_SetSRID(ST_MakePoint(x, z), 0) AS geom
+FROM player_traces
+ORDER BY player_name, timestamp DESC;

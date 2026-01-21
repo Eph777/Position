@@ -101,33 +101,7 @@ GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};
 CREATE EXTENSION IF NOT EXISTS postgis;
 GRANT ALL ON SCHEMA public TO ${DB_USER};
 
--- Create optimized view for QGIS live tracking (latest position per player)
-CREATE OR REPLACE VIEW view_live_positions AS
-SELECT DISTINCT ON (player_name) 
-    id, player_name, x, y, z, timestamp,
-    ST_SetSRID(ST_MakePoint(x, z), 0) AS geom
-FROM player_traces
-ORDER BY player_name, timestamp DESC;
-
-    ST_SetSRID(ST_MakePoint(x, z), 0) AS geom
-FROM player_traces
-ORDER BY player_name, timestamp DESC;
-
-GRANT SELECT ON view_live_positions TO ${DB_USER};
-
--- Create archive table if it doesn't exist (mirrors schema_postgresql.sql)
-CREATE TABLE IF NOT EXISTS player_traces_archive (
-    id SERIAL PRIMARY KEY,
-    player_name VARCHAR(100) NOT NULL,
-    x DOUBLE PRECISION NOT NULL,
-    y DOUBLE PRECISION NOT NULL,
-    z DOUBLE PRECISION NOT NULL,
-    timestamp TIMESTAMP WITH TIME ZONE,
-    archived_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-GRANT ALL PRIVILEGES ON TABLE player_traces_archive TO ${DB_USER};
-GRANT USAGE, SELECT ON SEQUENCE player_traces_archive_id_seq TO ${DB_USER};
+GRANT ALL ON SCHEMA public TO ${DB_USER};
 EOF
 
 print_info "PostgreSQL configuration complete!"
