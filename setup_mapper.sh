@@ -27,8 +27,14 @@ print_info "=== Minetest Mapper Setup ==="
 
 # Step 1: Install dependencies
 print_info "Installing dependencies..."
-sudo apt-get update
-sudo apt-get install -y cmake libgd-dev libsqlite3-dev libpostgresql-dev libhiredis-dev libleveldb-dev litleveldb-dev git build-essential
+sudo apt update
+sudo apt install -y cmake libgd-dev libsqlite3-dev libpostgresql-dev libhiredis-dev libleveldb-dev git build-essential
+
+# Verify cmake installed
+if ! command -v cmake &> /dev/null; then
+    print_error "cmake could not be installed. Please install it manually."
+    exit 1
+fi
 
 # Step 2: Clone minetest-mapper
 if [ -d "$MAPPER_DIR" ]; then
