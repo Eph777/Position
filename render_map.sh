@@ -21,15 +21,9 @@ echo "Rendering map..."
 TEMP_IMAGE="$OUTPUT_DIR/map_temp.png"
 
 # Render to temp file first (Atomic update)
-# We render with a solid black background, then use ImageMagick to make it transparent
-$MAPPER_EXE --input "$WORLD_PATH" --output "$TEMP_IMAGE" --bgcolor "#000000" --colors "$COLORS_FILE" --geometry -5000:-5000+10000+10000
+$MAPPER_EXE --input "$WORLD_PATH" --output "$TEMP_IMAGE" --bgcolor "#00ffffff" --colors "$COLORS_FILE" --geometry -5000:-5000+10000+10000
 
 if [ $? -eq 0 ]; then
-    # Make black background transparent using ImageMagick
-    # -transparent black: makes pure black pixels transparent
-    # -fuzz 5%: optional, handles slight compression artifacts
-    convert "$TEMP_IMAGE" -transparent black "$TEMP_IMAGE"
-    
     # Atomically move temp file to final file
     mv "$TEMP_IMAGE" "$OUTPUT_IMAGE"
     echo "Map rendered successfully: $OUTPUT_IMAGE"
