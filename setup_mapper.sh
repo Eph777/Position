@@ -36,13 +36,13 @@ if [ -d "$MAPPER_DIR" ]; then
     cd "$MAPPER_DIR"
     git pull
 else
-    print_info "Cloning minetest-mapper..."
-    git clone https://github.com/minetest/minetest-mapper.git "$MAPPER_DIR"
+    print_info "Cloning minetestmapper..."
+    git clone https://github.com/luanti-org/minetestmapper.git "$MAPPER_DIR"
     cd "$MAPPER_DIR"
 fi
 
 # Step 3: Compile
-print_info "Compiling minetest-mapper..."
+print_info "Compiling minetestmapper..."
 cmake . -DENABLE_LEVELDB=1
 make -j$(nproc)
 
@@ -55,10 +55,10 @@ else
 fi
 
 # Step 5: Copy colors.txt
-# This file defines how blocks are colored. We need a default one.
+# This file defines how blocks are colored.
 if [ ! -f "$MAPPER_DIR/colors.txt" ]; then
     print_info "Downloading default colors.txt..."
-    wget https://raw.githubusercontent.com/minetest/minetest-mapper/master/colors.txt -O "$MAPPER_DIR/colors.txt"
+    wget https://raw.githubusercontent.com/luanti-org/minetestmapper/master/colors.txt -O "$MAPPER_DIR/colors.txt"
 fi
 
 print_info "Setup complete! executable is located at: $MAPPER_DIR/minetest_mapper"
