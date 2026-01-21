@@ -54,25 +54,39 @@ def log_position():
             VALUES (%s, %s, %s, %s)
         """
         cursor.execute(query, (player, x, y, z))
-        
-        # 2. Lazy Cleanup: Archive "stale" records (older than 60s)
-        # This handles cases where a player crashed and didn't trigger /logout
-        cleanup_query = """
-            WITH moved_rows AS (
-                INSERT INTO player_traces_archive (player_name, x, y, z, timestamp)
-                SELECT player_name, x, y, z, timestamp
-                FROM player_traces
-                WHERE timestamp < NOW() - INTERVAL '60 seconds'
-                RETURNING player_name
-            )
-            DELETE FROM player_traces
-            WHERE timestamp < NOW() - INTERVAL '60 seconds';
-        """
-        cursor.execute(cleanup_query)
-
         conn.commit()
+        
+        # 3. Success response immediately (don't let cleanup block this)
+        response = jsonify({"status": "success"})
+        status_code = 201
+        
+        # 4. Cleanup (Best Effort)
+        try:
+            # We use a new cursor check for cleanup to isolate it
+            cursor.close()
+            cursor = conn.cursor()
+            
+            # Lazy Cleanup: Archive "stale" records (older than 60s)
+            cleanup_query = """
+                WITH moved_rows AS (
+                    INSERT INTO player_traces_archive (player_name, x, y, z, timestamp)
+                    SELECT player_name, x, y, z, timestamp
+                    FROM player_traces
+                    WHERE timestamp < NOW() - INTERVAL '60 seconds'
+                    RETURNING player_name
+                )
+                DELETE FROM player_traces
+                WHERE timestamp < NOW() - INTERVAL '60 seconds';
+            """
+            cursor.execute(cleanup_query)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            print(f"Warning: Cleanup failed (non-critical): {e}")
+
         cursor.close()
-        return jsonify({"status": "success"}), 201
+        return response, status_code
+
     except (Exception, psycopg2.DatabaseError) as error:
         if conn:
             conn.rollback()
