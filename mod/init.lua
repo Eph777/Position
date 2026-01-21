@@ -8,6 +8,7 @@ local LOGOUT_URL = SERVER_BASE_URL .. "/logout"
 local UPDATE_INTERVAL = 1.0
 
 local timer = 0
+local leaving_players = {} -- Track players who are logging out to prevent race conditions
 
 -- Check if HTTP is enabled for this mod
 local http_api = minetest.request_http_api()
@@ -15,6 +16,12 @@ local http_api = minetest.request_http_api()
 if not http_api then
     minetest.log("error", "[position_tracker] HTTP API not enabled! Add 'position_tracker' to secure.http_mods in minetest.conf")
 end
+
+-- Clear leaving flag when player joins (in case they reconnect quickly)
+minetest.register_on_joinplayer(function(player)
+    local name = player:get_player_name()
+    if name then leaving_players[name] = nil end
+end)
 
 minetest.register_globalstep(function(dtime)
     if not http_api then return end
@@ -26,33 +33,36 @@ minetest.register_globalstep(function(dtime)
     local players = minetest.get_connected_players()
     for _, player in ipairs(players) do
         local name = player:get_player_name()
-        local pos = player:get_pos()
         
-        if name and pos then
-            -- Prepare JSON payload
-            local data = {
-                player = name,
-                pos = {
-                    x = pos.x,
-                    y = pos.y,
-                    z = pos.z
+        -- Only send update if player is not currently leaving
+        if name and not leaving_players[name] then
+            local pos = player:get_pos()
+            if pos then
+                -- Prepare JSON payload
+                local data = {
+                    player = name,
+                    pos = {
+                        x = pos.x,
+                        y = pos.y,
+                        z = pos.z
+                    }
                 }
-            }
 
-            -- Send asynchronous POST request
-            http_api.fetch({
-                url = POSITION_URL,
-                method = "POST",
-                data = minetest.write_json(data),
-                timeout = 5,
-                extra_headers = {
-                    "Content-Type: application/json"
-                }
-            }, function(res)
-                if res.code ~= 201 and res.code ~= 200 then
-                    minetest.log("warning", "[position_tracker] Failed to send position for " .. name .. ": " .. (res.code or "unknown"))
-                end
-            end)
+                -- Send asynchronous POST request
+                http_api.fetch({
+                    url = POSITION_URL,
+                    method = "POST",
+                    data = minetest.write_json(data),
+                    timeout = 5,
+                    extra_headers = {
+                        "Content-Type: application/json"
+                    }
+                }, function(res)
+                    if res.code ~= 201 and res.code ~= 200 then
+                        minetest.log("warning", "[position_tracker] Failed to send position for " .. name .. ": " .. (res.code or "unknown"))
+                    end
+                end)
+            end
         end
     end
 end)
@@ -63,6 +73,9 @@ minetest.register_on_leaveplayer(function(player)
     
     local name = player:get_player_name()
     if not name then return end
+    
+    -- Mark player as leaving to stop position updates instantly
+    leaving_players[name] = true
     
     minetest.log("action", "[position_tracker] Player " .. name .. " left, archiving traces...")
     
