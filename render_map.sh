@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-MAPPER_EXE="$HOME/minetest-mapper/minetest_mapper"
+MAPPER_EXE="$HOME/minetest-mapper/minetestmapper"
 COLORS_FILE="$HOME/minetest-mapper/colors.txt"
 WORLD_PATH="$HOME/snap/luanti/common/.minetest/worlds/myworld"
 OUTPUT_DIR="$HOME/Position/map_output"

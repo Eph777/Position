@@ -28,7 +28,7 @@ print_info "=== Minetest Mapper Setup ==="
 # Step 1: Install dependencies
 print_info "Installing dependencies..."
 sudo apt update
-sudo apt install -y cmake libgd-dev libsqlite3-dev libpostgresql-dev libhiredis-dev libleveldb-dev git build-essential
+sudo apt install -y cmake libgd-dev zlib1g-dev libpng-dev libjpeg-dev libsqlite3-dev libpq-dev libhiredis-dev libleveldb-dev git build-essential
 
 # Verify cmake installed
 if ! command -v cmake &> /dev/null; then
@@ -47,13 +47,18 @@ else
     cd "$MAPPER_DIR"
 fi
 
-# Step 3: Compile
+# Step 3: Compiling
 print_info "Compiling minetestmapper..."
+# CRITICAL: Remove cache file if it exists
+if [ -f "CMakeCache.txt" ]; then
+    rm CMakeCache.txt
+fi
+
 cmake . -DENABLE_LEVELDB=1
 make -j$(nproc)
 
 # Step 4: Verify installation
-if [ -f "$MAPPER_DIR/minetest_mapper" ]; then
+if [ -f "$MAPPER_DIR/minetestmapper" ]; then
     print_info "Compilation successful!"
 else
     print_error "Compilation failed. Check the errors above."
