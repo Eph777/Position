@@ -65,8 +65,8 @@ sudo apt update
 sudo apt upgrade -y
 
 # Step 2: Install required packages
-print_info "Step 2/9: Installing PostgreSQL, Python, Git, and Snap..."
-sudo apt install -y postgresql postgresql-contrib python3 python3-pip python3-venv git snapd
+print_info "Step 2/9: Installing PostgreSQL, PostGIS, Python, Git, and Snap..."
+sudo apt install -y postgresql postgresql-contrib postgis python3 python3-pip python3-venv git snapd
 
 # Step 3: Install Luanti via Snap
 print_info "Step 3/9: Installing Luanti via Snap..."
@@ -98,6 +98,7 @@ CREATE DATABASE ${DB_NAME};
 CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';
 GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};
 \c ${DB_NAME}
+CREATE EXTENSION IF NOT EXISTS postgis;
 GRANT ALL ON SCHEMA public TO ${DB_USER};
 
 -- Create optimized view for QGIS live tracking (latest position per player)
