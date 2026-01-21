@@ -98,6 +98,12 @@ print_info "Creating database and user..."
 sudo systemctl stop luanti-tracker-postgresql || true
 
 sudo -u postgres psql <<EOF
+-- Force kill all active connections to the database to allow dropping
+SELECT pg_terminate_backend(pg_stat_activity.pid)
+FROM pg_stat_activity
+WHERE pg_stat_activity.datname = '${DB_NAME}'
+  AND pid <> pg_backend_pid();
+
 DROP DATABASE IF EXISTS ${DB_NAME};
 DROP USER IF EXISTS ${DB_USER};
 CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';
