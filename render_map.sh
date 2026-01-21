@@ -21,7 +21,7 @@ echo "Rendering map..."
 # Run mapper
 # --geometry: coordinates to render (default: full world)
 # --zoom: scaling factor (1 = 1 pixel per node)
-$MAPPER_EXE --input "$WORLD_PATH" --output "$OUTPUT_IMAGE" --colors "$COLORS_FILE" --geometry -5000:-5000:10000:10000
+$MAPPER_EXE --input "$WORLD_PATH" --output "$OUTPUT_IMAGE" --colors "$COLORS_FILE" --geometry -5000:-5000+10000+10000
 
 if [ $? -eq 0 ]; then
     echo "Map rendered successfully: $OUTPUT_IMAGE"
