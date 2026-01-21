@@ -99,6 +99,20 @@ CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';
 GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};
 \c ${DB_NAME}
 GRANT ALL ON SCHEMA public TO ${DB_USER};
+
+-- Create optimized view for QGIS live tracking (latest position per player)
+CREATE OR REPLACE VIEW view_live_positions AS
+SELECT DISTINCT ON (player_name) 
+    id,
+    player_name,
+    x,
+    y,
+    z,
+    timestamp
+FROM player_traces
+ORDER BY player_name, timestamp DESC;
+
+GRANT SELECT ON view_live_positions TO ${DB_USER};
 EOF
 
 print_info "PostgreSQL configuration complete!"
