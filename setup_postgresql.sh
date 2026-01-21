@@ -101,7 +101,12 @@ GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};
 CREATE EXTENSION IF NOT EXISTS postgis;
 GRANT ALL ON SCHEMA public TO ${DB_USER};
 
-GRANT ALL ON SCHEMA public TO ${DB_USER};
+-- Fix permissions for tables possibly created by root in previous runs
+ALTER TABLE IF EXISTS player_traces OWNER TO ${DB_USER};
+ALTER TABLE IF EXISTS player_traces_archive OWNER TO ${DB_USER};
+ALTER VIEW IF EXISTS view_live_positions OWNER TO ${DB_USER};
+ALTER SEQUENCE IF EXISTS player_traces_id_seq OWNER TO ${DB_USER};
+ALTER SEQUENCE IF EXISTS player_traces_archive_id_seq OWNER TO ${DB_USER};
 EOF
 
 print_info "PostgreSQL configuration complete!"
