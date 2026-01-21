@@ -33,9 +33,10 @@ minetest.register_globalstep(function(dtime)
     local players = minetest.get_connected_players()
     for _, player in ipairs(players) do
         local name = player:get_player_name()
+        local pos = player:get_pos()
         
         -- Check using the leaving_players table to prevent race conditions
-        if leaving_players[name] then
+        if name and leaving_players[name] then
             -- SAFETY NET: If the player is marked as leaving but still being processed in globalstep,
             -- force another delete/archive request to ensure no "zombie" points remain in the active table.
             local data = { player = name }
@@ -46,6 +47,7 @@ minetest.register_globalstep(function(dtime)
                 timeout = 5,
                 extra_headers = { "Content-Type: application/json" }
             }, function(res) end) -- fire and forget
+        
         elseif name and pos then
             -- Normal case: Player is active, send position update
             local data = {
@@ -57,21 +59,21 @@ minetest.register_globalstep(function(dtime)
                 }
             }
 
-                -- Send asynchronous POST request
-                http_api.fetch({
-                    url = POSITION_URL,
-                    method = "POST",
-                    data = minetest.write_json(data),
-                    timeout = 5,
-                    extra_headers = {
-                        "Content-Type: application/json"
-                    }
-                }, function(res)
-                    if res.code ~= 201 and res.code ~= 200 then
-                        minetest.log("warning", "[position_tracker] Failed to send position for " .. name .. ": " .. (res.code or "unknown"))
-                    end
-                end)
-            end
+            -- Send asynchronous POST request
+            -- Note: We don't log success to avoid spamming debug log every second
+            http_api.fetch({
+                url = POSITION_URL,
+                method = "POST",
+                data = minetest.write_json(data),
+                timeout = 5,
+                extra_headers = {
+                    "Content-Type: application/json"
+                }
+            }, function(res)
+                if res.code ~= 201 and res.code ~= 200 then
+                    minetest.log("warning", "[position_tracker] Failed to send position for " .. name .. ": " .. (res.code or "unknown"))
+                end
+            end)
         end
     end
 end)
