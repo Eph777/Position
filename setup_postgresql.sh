@@ -93,9 +93,15 @@ print_info "PostgreSQL authentication configured!"
 
 # Create database and user
 print_info "Creating database and user..."
+
+# Stop service to ensure no active DB connections prevent the drop
+sudo systemctl stop luanti-tracker-postgresql || true
+
 sudo -u postgres psql <<EOF
-CREATE DATABASE ${DB_NAME};
+DROP DATABASE IF EXISTS ${DB_NAME};
+DROP USER IF EXISTS ${DB_USER};
 CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';
+CREATE DATABASE ${DB_NAME};
 GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};
 \c ${DB_NAME}
 CREATE EXTENSION IF NOT EXISTS postgis;
