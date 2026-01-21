@@ -18,12 +18,14 @@ if [ ! -f "$WORLD_PATH/map.sqlite" ]; then
 fi
 
 echo "Rendering map..."
-# Run mapper
-# --geometry: coordinates to render (default: full world)
-# --zoom: scaling factor (1 = 1 pixel per node)
-$MAPPER_EXE --input "$WORLD_PATH" --output "$OUTPUT_IMAGE" --colors "$COLORS_FILE" --geometry -5000:-5000+10000+10000
+TEMP_IMAGE="$OUTPUT_DIR/map_temp.png"
+
+# Render to temp file first (Atomic update)
+$MAPPER_EXE --input "$WORLD_PATH" --output "$TEMP_IMAGE" --colors "$COLORS_FILE" --geometry -5000:-5000+10000+10000
 
 if [ $? -eq 0 ]; then
+    # Atomically move temp file to final file
+    mv "$TEMP_IMAGE" "$OUTPUT_IMAGE"
     echo "Map rendered successfully: $OUTPUT_IMAGE"
     
     # Generate World File (.pgw) for QGIS

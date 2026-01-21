@@ -175,10 +175,13 @@ SELECT
     y,
     z,
     timestamp,
-    ST_SetSRID(ST_MakePoint(x, z), 4326) AS geom
+    ST_SetSRID(ST_MakePoint(x, z), 0) AS geom
 FROM player_traces
 ORDER BY timestamp DESC
 ```
+
+
+**Note:** We use SRID 0 because Luanti uses a flat coordinate system (meters), not Latitude/Longitude. If you use 4326, points > 180 will disappear!
 
 3. Click **Execute (F5)** to check if it runs.
 4. Check the box **Load as new layer**.
@@ -334,11 +337,15 @@ On your server, we need to install the mapper tool and generate the map.
    # key output: ~/Position/map_output/map.png AND map.pgw
    ```
 
-3. **Get the Map to your Local Machine**:
-   Use `scp` to download the generated files to your local computer:
+3. **CRITICAL: Download the Map to your Computer**:
+   The map is a **file**, not a database entry. You must download it to your local machine to see it in QGIS.
+   
+   Open a terminal on your **local computer** (not the server) and run:
    ```bash
+   # Replace YOUR_SERVER_IP with your actual IP, e.g. 72.62.188.155
    scp -r root@YOUR_SERVER_IP:~/Position/map_output ./
    ```
+   You will now have a `map_output` folder on your computer containing `map.png`.
 
 ### Step 2: Define Custom CRS in QGIS
 
@@ -353,16 +360,18 @@ Luanti uses a flat coordinate system (1 node = 1 meter), which doesn't match sta
    ```
    +proj=ortho +lat_0=0 +lon_0=0 +x_0=0 +y_0=0 +a=6371000 +b=6371000 +units=m +no_defs
    ```
-   *Explanation: This creates a simple Metric Orthographic projection centered at 0,0.*
 6. Click **Validate** and **OK**.
 
-### Step 3: Import the Map
+### Step 3: Import the Map (Raster Layer)
 
 1. **Project → Properties → CRS**: Search for your `Luanti World` CRS and select it. Apply.
 2. **Layer → Add Layer → Add Raster Layer...**
-3. Select the `map.png` file you downloaded.
-4. **Important**: Because we generated a `.pgw` file alongside it, QGIS automatically places it at the exact coordinates!
-   *   Verify: Hover over the center of the map. Coordinates should be near `0,0`.
+3. Browse to the `map_output/map.png` file you downloaded.
+4. Click **Add**.
+
+**Important**: Because we generated a `.pgw` file alongside it, QGIS automatically places it at the exact coordinates!
+*   **Verify**: Hover over the center of the map. Coordinates should be near `0,0`.
+*   **Layer Order**: Make sure `map.png` is at the **bottom** of your Layers list, so the player dots appear on top of it.
 
 ### Step 4: Real-Time Auto-Refresh
 
@@ -386,23 +395,33 @@ Now that you have the background, let's make the player dots move live!
    5. Set to **2.0 seconds**.
    6. Click **OK**.
 
-### Step 5: Automate Map Updates (Server Side)
+### Step 5: Real-Time Map Sync (HTTP)
 
-To keep the background map updated as players explore:
+To have the map update automatically every 15 seconds without creating a new file layer manually:
 
-1. Edit crontab on the server:
-   ```bash
-   crontab -e
-   ```
-2. Add this line to run the renderer every 10 minutes:
-   ```bash
-   */10 * * * * /root/Position/render_map.sh
-   ```
+1.  **Set up the Hosting Service (Server-side)**:
+    Run this new script on your server:
+    ```bash
+    ./setup_map_hosting.sh
+    ```
+    This does two things:
+    - Starts a background loop that re-renders the map every 15 seconds.
+    - Starts a lightweight Web Server on port **8080**.
 
-3. **Syncing to QGIS**:
-   You can set up a simple HTTP server to serve the map image, and add it as a "Raster Layer via HTTP" or maintain a local sync.
-   *   *Simplest*: Just re-download `map.png` occasionally.
-   *   *Advanced*: Run `python3 -m http.server 8080` in the output folder, and access via `http://YOUR_IP:8080/map.png` as a Raster Layer in QGIS.
+2.  **Add HTTP Layer in QGIS**:
+    1.  Go to **Layer → Add Layer → Add Raster Layer...**
+    2.  **Source Type**: Select `Protocol: HTTP(W), HTTPS, FTP...`
+    3.  **Type**: `HTTP/HTTPS/FTP`
+    4.  **URL**: `http://YOUR_SERVER_IP:8080/map.png`
+    5.  Click **Add**.
+
+3.  **Set Auto-Refresh**:
+    1.  Right-click the new `map` layer.
+    2.  **Properties** → **Rendering**.
+    3.  Check **Refresh layer at interval**.
+    4.  Set to **15 seconds** (matching your server render time).
+
+Now QGIS will re-download the map image every 15 seconds, keeping your Mission Control view perfectly in sync with the live game world!
 
 ---
 

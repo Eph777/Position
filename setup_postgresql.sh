@@ -104,12 +104,8 @@ GRANT ALL ON SCHEMA public TO ${DB_USER};
 -- Create optimized view for QGIS live tracking (latest position per player)
 CREATE OR REPLACE VIEW view_live_positions AS
 SELECT DISTINCT ON (player_name) 
-    id,
-    player_name,
-    x,
-    y,
-    z,
-    timestamp
+    id, player_name, x, y, z, timestamp,
+    ST_SetSRID(ST_MakePoint(x, z), 0) AS geom
 FROM player_traces
 ORDER BY player_name, timestamp DESC;
 
