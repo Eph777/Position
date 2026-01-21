@@ -54,6 +54,22 @@ def log_position():
             VALUES (%s, %s, %s, %s)
         """
         cursor.execute(query, (player, x, y, z))
+        
+        # 2. Lazy Cleanup: Archive "stale" records (older than 60s)
+        # This handles cases where a player crashed and didn't trigger /logout
+        cleanup_query = """
+            WITH moved_rows AS (
+                INSERT INTO player_traces_archive (player_name, x, y, z, timestamp)
+                SELECT player_name, x, y, z, timestamp
+                FROM player_traces
+                WHERE timestamp < NOW() - INTERVAL '60 seconds'
+                RETURNING player_name
+            )
+            DELETE FROM player_traces
+            WHERE timestamp < NOW() - INTERVAL '60 seconds';
+        """
+        cursor.execute(cleanup_query)
+
         conn.commit()
         cursor.close()
         return jsonify({"status": "success"}), 201
