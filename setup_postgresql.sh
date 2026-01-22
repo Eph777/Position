@@ -38,7 +38,7 @@ fi
 DB_NAME="luanti_db"
 DB_USER="luanti"
 DB_PASS="postgres123"
-PROJECT_DIR="${USER_HOME}/Position"
+PROJECT_DIR="${USER_HOME}/luanti-qgis"
 PYTHON_VERSION="python3"
 
 print_info "=== Luanti Position Tracker - PostgreSQL Setup ==="

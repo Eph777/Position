@@ -5,7 +5,7 @@ USER_HOME=$(eval echo ~$SUDO_USER)
 if [ -z "$SUDO_USER" ]; then
     USER_HOME="$HOME"
 fi
-PROJECT_DIR="$USER_HOME/Position"
+PROJECT_DIR="$USER_HOME/luanti-qgis"
 MAP_OUTPUT_DIR="$PROJECT_DIR/map_output"
 RENDER_SCRIPT="$PROJECT_DIR/render_map.sh"
 
