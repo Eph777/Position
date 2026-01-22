@@ -201,7 +201,7 @@ print_info "Migrating database to SQLite3..."
 /snap/bin/luanti --server --world ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld --migrate-mod-storage sqlite3
 /snap/bin/luanti --server --world ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld --migrate-auth sqlite3
 /snap/bin/luanti --server --world ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld --migrate-players sqlite3
-/snap/bin/luanti --server --world ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld --migrate sqlite3
+# /snap/bin/luanti --server --world ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld --migrate sqlite3
 
 # Define your paths here for cleaner usage
 # LUANTI_BIN="/snap/bin/luanti"
