@@ -125,7 +125,7 @@ Fill in the connection details:
 
 **Connection Details:**
 - **Name**: `Luanti Position Tracker`
-- **Host**: `YOUR_SERVER_IP` (e.g., `72.62.188.155`) or `localhost`
+- **Host**: `YOUR_SERVER_IP` (e.g., `88.88.88.88`) or `localhost`
 - **Port**: `5432`
 - **Database**: `luanti_db`
 
@@ -342,7 +342,7 @@ On your server, we need to install the mapper tool and generate the map.
    
    Open a terminal on your **local computer** (not the server) and run:
    ```bash
-   # Replace YOUR_SERVER_IP with your actual IP, e.g. 72.62.188.155
+   # Replace YOUR_SERVER_IP with your actual IP, e.g. 88.88.88.88
    scp -r root@YOUR_SERVER_IP:~/Position/map_output ./
    ```
    You will now have a `map_output` folder on your computer containing `map.png`.
