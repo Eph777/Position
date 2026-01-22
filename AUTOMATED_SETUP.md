@@ -26,7 +26,7 @@ chmod +x setup_postgresql.sh
 
 1. **Fresh Ubuntu 20.04+ server**
 2. **Regular user with sudo privileges** (do NOT run as root)
-3. **Position folder uploaded to `~/Position`** before running the script
+3. **Position folder uploaded to `~/luanti-qgis`** before running the script
 
 ## Usage
 

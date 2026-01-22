@@ -21,7 +21,7 @@ print_error() {
 # Configuration
 MAPPER_DIR="$HOME/minetest-mapper"
 # Standard location for Snap installs
-WORLD_PATH="$HOME/snap/luanti/common/.luanti/worlds/myworld"
+WORLD_PATH="$HOME/snap/luanti/common/.minetest/worlds/myworld"
 
 print_info "=== Minetest Mapper Setup ==="
 

@@ -3,7 +3,7 @@
 # Configuration
 MAPPER_EXE="$HOME/minetest-mapper/minetestmapper"
 COLORS_FILE="$HOME/minetest-mapper/colors.txt"
-WORLD_PATH="$HOME/snap/luanti/common/.luanti/worlds/myworld"
+WORLD_PATH="$HOME/snap/luanti/common/.minetest/worlds/myworld"
 OUTPUT_DIR="$HOME/luanti-qgis/map_output"
 OUTPUT_IMAGE="$OUTPUT_DIR/map.png"
 OUTPUT_WORLD_FILE="$OUTPUT_DIR/map.pgw"

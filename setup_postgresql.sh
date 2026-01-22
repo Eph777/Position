@@ -164,37 +164,37 @@ print_info "Python application setup complete!"
 print_info "Step 6/9: Installing Luanti game content..."
 
 # Create directories
-mkdir -p ${USER_HOME}/snap/luanti/common/.luanti/games
-mkdir -p ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld
-mkdir -p ${USER_HOME}/snap/luanti/common/.luanti/mods
+mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/games
+mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld
+mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/mods
 
 # Clone Minetest Game
-if [ ! -d ${USER_HOME}/snap/luanti/common/.luanti/games/minetest_game ]; then
+if [ ! -d ${USER_HOME}/snap/luanti/common/.minetest/games/minetest_game ]; then
     print_info "Downloading Minetest Game..."
-    git clone https://github.com/minetest/minetest_game.git ${USER_HOME}/snap/luanti/common/.luanti/games/minetest_game
+    git clone https://github.com/minetest/minetest_game.git ${USER_HOME}/snap/luanti/common/.minetest/games/minetest_game
 else
     print_info "Minetest Game already exists, skipping..."
 fi
 
 # Create world configuration
 print_info "Creating world configuration..."
-echo "gameid = minetest_game" > ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld/world.mt
-echo "backend = sqlite3" >> ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld/world.mt
-echo "load_mod_position_tracker = true" >> ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld/world.mt
+echo "gameid = minetest_game" > ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld/world.mt
+echo "backend = sqlite3" >> ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld/world.mt
+echo "load_mod_position_tracker = true" >> ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld/world.mt
 
 # Copy mod
 print_info "Installing or updating position tracker mod..."
 # Ensure destination exists
-mkdir -p ${USER_HOME}/snap/luanti/common/.luanti/mods/position_tracker
+mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker
 # Copy contents (force overwrite)
-cp -r "$PROJECT_DIR/mod/"* ${USER_HOME}/snap/luanti/common/.luanti/mods/position_tracker/
+cp -r "$PROJECT_DIR/mod/"* ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker/
 
 # Configure mod
 print_info "Configuring mod..."
-sed -i 's|local SERVER_URL = .*|local SERVER_URL = "http://localhost:5000/position"|' ${USER_HOME}/snap/luanti/common/.luanti/mods/position_tracker/init.lua
+sed -i 's|local SERVER_URL = .*|local SERVER_URL = "http://localhost:5000/position"|' ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker/init.lua
 
 # Create minetest.conf
-echo "secure.http_mods = position_tracker" > ${USER_HOME}/snap/luanti/common/.luanti/minetest.conf
+echo "secure.http_mods = position_tracker" > ${USER_HOME}/snap/luanti/common/.minetest/minetest.conf
 
 print_info "Luanti setup complete!"
 
@@ -286,7 +286,7 @@ print_info "Step 9/9: Creating Luanti server start script..."
 
 cat > ${USER_HOME}/sls <<'EOF'
 #!/bin/bash
-/snap/bin/luanti --server --world ~/snap/luanti/common/.luanti/worlds/myworld --gameid minetest_game --port 30000
+/snap/bin/luanti --server --world ~/snap/luanti/common/.minetest/worlds/myworld --gameid minetest_game --port 30000
 EOF
 
 chmod +x ${USER_HOME}/sls

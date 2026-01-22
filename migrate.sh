@@ -37,7 +37,7 @@ fi
 update_world_mt() {
     local key=$1
     local value=$2
-    local file="${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld/world.mt"
+    local file="${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld/world.mt"
     
     if grep -q "^${key} *=" "$file"; then
         sed -i "s|^${key} *=.*|${key} = ${value}|" "$file"
@@ -50,20 +50,20 @@ update_world_mt() {
 print_info "Migrating database to SQLite3..."
 
 update_world_mt "mod_storage_backend" "sqlite3"
-/snap/bin/luanti --server --world ~/snap/luanti/common/.luanti/worlds/myworld --migrate-mod-storage sqlite3
+/snap/bin/luanti --server --world ~/snap/luanti/common/.minetest/worlds/myworld --migrate-mod-storage sqlite3
 
 update_world_mt "auth_backend" "sqlite3"
-/snap/bin/luanti --server --world ~/snap/luanti/common/.luanti/worlds/myworld --migrate-auth sqlite3
+/snap/bin/luanti --server --world ~/snap/luanti/common/.minetest/worlds/myworld --migrate-auth sqlite3
 
 update_world_mt "player_backend" "sqlite3"
-/snap/bin/luanti --server --world ~/snap/luanti/common/.luanti/worlds/myworld --migrate-players sqlite3
+/snap/bin/luanti --server --world ~/snap/luanti/common/.minetest/worlds/myworld --migrate-players sqlite3
 
 update_world_mt "backend" "sqlite3"
-/snap/bin/luanti --server --world ~/snap/luanti/common/.luanti/worlds/myworld --migrate sqlite3
+/snap/bin/luanti --server --world ~/snap/luanti/common/.minetest/worlds/myworld --migrate sqlite3
 
 # # Define your paths here for cleaner usage
 # LUANTI_BIN="/snap/bin/luanti"
-# WORLD_PATH="${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld" 
+# WORLD_PATH="${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld" 
 
 # # Function to run a migration and handle the "same backend" error
 # safe_migrate() {
