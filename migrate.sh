@@ -13,11 +13,22 @@ print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
+
+
+
+
 # Migrate database to SQLite3
 print_info "Migrating database to SQLite3..."
+sed -i 's|mod_storage_backend = .*|mod_storage_backend = sqlite3|' ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld/world.mt
 /snap/bin/luanti --server --world ~/snap/luanti/common/.luanti/worlds/myworld --migrate-mod-storage sqlite3
+
+sed -i 's|auth_backend = .*|auth_backend = sqlite3|' ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld/world.mt
 /snap/bin/luanti --server --world ~/snap/luanti/common/.luanti/worlds/myworld --migrate-auth sqlite3
+
+sed -i 's|player_backend = .*|player_backend = sqlite3|' ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld/world.mt
 /snap/bin/luanti --server --world ~/snap/luanti/common/.luanti/worlds/myworld --migrate-players sqlite3
+
+sed -i 's|backend = .*|backend = sqlite3|' ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld/world.mt
 /snap/bin/luanti --server --world ~/snap/luanti/common/.luanti/worlds/myworld --migrate sqlite3
 
 # # Define your paths here for cleaner usage
