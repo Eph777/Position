@@ -1,5 +1,18 @@
 #!/bin/bash
 
+# Function to print colored output
+print_info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
 # Migrate database to SQLite3
 print_info "Migrating database to SQLite3..."
 # /snap/bin/luanti --server --world ~/snap/luanti/common/.luanti/worlds/myworld --migrate-mod-storage sqlite3
@@ -7,11 +20,11 @@ print_info "Migrating database to SQLite3..."
 # /snap/bin/luanti --server --world ~/snap/luanti/common/.luanti/worlds/myworld --migrate-players sqlite3
 # /snap/bin/luanti --server --world ~/snap/luanti/common/.luanti/worlds/myworld --migrate sqlite3
 
-Define your paths here for cleaner usage
+# Define your paths here for cleaner usage
 LUANTI_BIN="/snap/bin/luanti"
 WORLD_PATH="${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld" 
 
-Function to run a migration and handle the "same backend" error
+# Function to run a migration and handle the "same backend" error
 safe_migrate() {
     FLAG=$1 # e.g., --migrate-auth
     NAME=$2 # e.g., "Auth"
