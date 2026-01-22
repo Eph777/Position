@@ -29,6 +29,7 @@ except (Exception, psycopg2.DatabaseError) as error:
     print(f"Error while connecting to PostgreSQL: {error}")
 
 @app.route('/position', methods=['POST'])
+
 def log_position():
     """
     Receives position data from Luanti mod.

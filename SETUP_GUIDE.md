@@ -318,14 +318,14 @@ sudo snap install luanti
 The engine needs game content to run. We'll install "Minetest Game".
 
 **For Snap users (Recommended):**
-The Snap version uses `.minetest` as the directory name.
+The Snap version uses `.luanti` as the directory name.
 
 ```bash
 # Create games directory
-mkdir -p ~/snap/luanti/common/.minetest/games
+mkdir -p ~/snap/luanti/common/.luanti/games
 
 # Download Minetest Game
-git clone https://github.com/minetest/minetest_game.git ~/snap/luanti/common/.minetest/games/minetest_game
+git clone https://github.com/minetest/minetest_game.git ~/snap/luanti/common/.luanti/games/minetest_game
 ```
 
 **For non-Snap users:**
@@ -340,9 +340,9 @@ git clone https://github.com/minetest/minetest_game.git ~/.luanti/games/minetest
 **For Snap users:**
 
 ```bash
-mkdir -p ~/snap/luanti/common/.minetest/worlds/myworld
-echo "gameid = minetest_game" > ~/snap/luanti/common/.minetest/worlds/myworld/world.mt
-echo "backend = sqlite3" >> ~/snap/luanti/common/.minetest/worlds/myworld/world.mt
+mkdir -p ~/snap/luanti/common/.luanti/worlds/myworld
+echo "gameid = minetest_game" > ~/snap/luanti/common/.luanti/worlds/myworld/world.mt
+echo "backend = sqlite3" >> ~/snap/luanti/common/.luanti/worlds/myworld/world.mt
 ```
 
 **For non-Snap users:**
@@ -361,7 +361,7 @@ echo "backend = sqlite3" >> ~/.luanti/worlds/myworld/world.mt
 
 The Luanti server mods folder is typically located at:
 
-- **Linux (Snap)**: `~/snap/luanti/common/.minetest/mods/`
+- **Linux (Snap)**: `~/snap/luanti/common/.luanti/mods/`
 - **Linux (Apt)**: `~/.luanti/mods/`
 - **Windows**: `.../AppData/Roaming/Luanti/mods/`
 
@@ -369,8 +369,8 @@ The Luanti server mods folder is typically located at:
 
 **For Snap users:**
 ```bash
-mkdir -p ~/snap/luanti/common/.minetest/mods
-cp -r ~/Position/mod ~/snap/luanti/common/.minetest/mods/position_tracker
+mkdir -p ~/snap/luanti/common/.luanti/mods
+cp -r ~/Position/mod ~/snap/luanti/common/.luanti/mods/position_tracker
 ```
 
 **For non-Snap users:**
@@ -383,7 +383,7 @@ cp -r ~/Position/mod ~/.luanti/mods/position_tracker
 
 **For Snap users:**
 ```bash
-nano ~/snap/luanti/common/.minetest/mods/position_tracker/init.lua
+nano ~/snap/luanti/common/.luanti/mods/position_tracker/init.lua
 ```
 
 **For non-Snap users:**
@@ -397,7 +397,7 @@ Update the `SERVER_URL`.
 
 **For Snap users:**
 ```bash
-nano ~/snap/luanti/common/.minetest/minetest.conf
+nano ~/snap/luanti/common/.luanti/minetest.conf
 ```
 
 **For non-Snap users:**
@@ -414,7 +414,7 @@ secure.http_mods = position_tracker
 
 **For Snap users:**
 ```bash
-nano ~/snap/luanti/common/.minetest/worlds/myworld/world.mt
+nano ~/snap/luanti/common/.luanti/worlds/myworld/world.mt
 ```
 
 **For non-Snap users:**

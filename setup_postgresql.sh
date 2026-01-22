@@ -164,38 +164,81 @@ print_info "Python application setup complete!"
 print_info "Step 6/9: Installing Luanti game content..."
 
 # Create directories
-mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/games
-mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld
-mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/mods
+mkdir -p ${USER_HOME}/snap/luanti/common/.luanti/games
+mkdir -p ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld
+mkdir -p ${USER_HOME}/snap/luanti/common/.luanti/mods
 
 # Clone Minetest Game
-if [ ! -d ${USER_HOME}/snap/luanti/common/.minetest/games/minetest_game ]; then
+if [ ! -d ${USER_HOME}/snap/luanti/common/.luanti/games/minetest_game ]; then
     print_info "Downloading Minetest Game..."
-    git clone https://github.com/minetest/minetest_game.git ${USER_HOME}/snap/luanti/common/.minetest/games/minetest_game
+    git clone https://github.com/minetest/minetest_game.git ${USER_HOME}/snap/luanti/common/.luanti/games/minetest_game
 else
     print_info "Minetest Game already exists, skipping..."
 fi
 
 # Create world configuration
 print_info "Creating world configuration..."
-echo "gameid = minetest_game" > ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld/world.mt
-echo "backend = sqlite3" >> ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld/world.mt
-echo "load_mod_position_tracker = true" >> ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld/world.mt
+echo "gameid = minetest_game" > ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld/world.mt
+echo "backend = sqlite3" >> ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld/world.mt
+echo "load_mod_position_tracker = true" >> ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld/world.mt
 
-# Copy mod
 # Copy mod
 print_info "Installing or updating position tracker mod..."
 # Ensure destination exists
-mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker
+mkdir -p ${USER_HOME}/snap/luanti/common/.luanti/mods/position_tracker
 # Copy contents (force overwrite)
-cp -r "$PROJECT_DIR/mod/"* ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker/
+cp -r "$PROJECT_DIR/mod/"* ${USER_HOME}/snap/luanti/common/.luanti/mods/position_tracker/
 
 # Configure mod
 print_info "Configuring mod..."
-sed -i 's|local SERVER_URL = .*|local SERVER_URL = "http://localhost:5000/position"|' ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker/init.lua
+sed -i 's|local SERVER_URL = .*|local SERVER_URL = "http://localhost:5000/position"|' ${USER_HOME}/snap/luanti/common/.luanti/mods/position_tracker/init.lua
 
 # Create minetest.conf
-echo "secure.http_mods = position_tracker" > ${USER_HOME}/snap/luanti/common/.minetest/minetest.conf
+echo "secure.http_mods = position_tracker" > ${USER_HOME}/snap/luanti/common/.luanti/minetest.conf
+
+# Migrate database to SQLite3
+print_info "Migrating database to SQLite3..."
+# /snap/bin/luanti --server --world ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld --migrate-mod-storage sqlite3
+# /snap/bin/luanti --server --world ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld --migrate-auth sqlite3
+# /snap/bin/luanti --server --world ${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld --migrate-players sqlite3
+
+# Define your paths here for cleaner usage
+LUANTI_BIN="/snap/bin/luanti"
+WORLD_PATH="${USER_HOME}/snap/luanti/common/.luanti/worlds/myworld" 
+
+# Function to run a migration and handle the "same backend" error
+safe_migrate() {
+    FLAG=$1 # e.g., --migrate-auth
+    NAME=$2 # e.g., "Auth"
+
+    echo "Attempting to migrate $NAME..."
+    
+    # Run the command and capture ALL output (errors and info combined)
+    OUTPUT=$($LUANTI_BIN --server --world "$WORLD_PATH" $FLAG sqlite3 2>&1)
+    EXIT_CODE=$?
+
+    # Logic: If success (0) OR if output contains the specific warning
+    if [ $EXIT_CODE -eq 0 ]; then
+        echo "$NAME: Successfully migrated."
+    elif echo "$OUTPUT" | grep -q "new backend is same as the old one"; then
+        echo "$NAME: Already on SQLite3. (Skipped)"
+    else
+        # If it failed for a real reason, show the error
+        echo "$NAME: Failed with error:"
+        echo "$OUTPUT"
+    fi
+}
+
+# Run the migrations using the function
+safe_migrate "--migrate-auth" "Authentication"
+safe_migrate "--migrate-players" "Players"
+safe_migrate "--migrate-mod-storage" "Mod Storage"
+
+# Note: Map migration uses just '--migrate', not '--migrate-map'
+safe_migrate "--migrate" "World Map"
+
+
+
 
 print_info "Luanti setup complete!"
 
@@ -285,12 +328,12 @@ print_info "Firewall configured!"
 # Step 9: Create Luanti server start script
 print_info "Step 9/9: Creating Luanti server start script..."
 
-cat > ${USER_HOME}/start-luanti-server.sh <<'EOF'
+cat > ${USER_HOME}/sls <<'EOF'
 #!/bin/bash
-/snap/bin/luanti --server --world ~/snap/luanti/common/.minetest/worlds/myworld --gameid minetest_game --port 30000
+/snap/bin/luanti --server --world ~/snap/luanti/common/.luanti/worlds/myworld --gameid minetest_game --port 30000
 EOF
 
-chmod +x ${USER_HOME}/start-luanti-server.sh
+chmod +x ${USER_HOME}/sls
 
 print_info "Luanti server start script created!"
 
@@ -316,7 +359,7 @@ echo "3. Verify data in PostgreSQL:"
 echo "   PGPASSWORD=${DB_PASS} psql -U ${DB_USER} -d ${DB_NAME} -c \"SELECT * FROM player_traces;\""
 echo ""
 echo "4. Start Luanti server:"
-echo "   ~/start-luanti-server.sh"
+echo "   ~/sls"
 echo ""
 echo "5. Connect from your Luanti client to:"
 echo "   Server IP: $(hostname -I | awk '{print $1}')"

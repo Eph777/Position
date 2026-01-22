@@ -3,7 +3,7 @@
 # Configuration
 MAPPER_EXE="$HOME/minetest-mapper/minetestmapper"
 COLORS_FILE="$HOME/minetest-mapper/colors.txt"
-WORLD_PATH="$HOME/snap/luanti/common/.minetest/worlds/myworld"
+WORLD_PATH="$HOME/snap/luanti/common/.luanti/worlds/myworld"
 OUTPUT_DIR="$HOME/Position/map_output"
 OUTPUT_IMAGE="$OUTPUT_DIR/map.png"
 OUTPUT_WORLD_FILE="$OUTPUT_DIR/map.pgw"
@@ -61,6 +61,3 @@ else
     echo "Rendering failed!"
     exit 1
 fi
-
-# If using tile server (Optional for future)
-# python3 -m http.server --directory "$OUTPUT_DIR" 8000 &
