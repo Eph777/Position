@@ -276,7 +276,17 @@ print_info "Systemd service created and started!"
 print_info "Step 8/9: Configuring firewall..."
 sudo ufw allow OpenSSH
 sudo ufw allow 5000/tcp
+sudo ufw allow 5432/tcp
 sudo ufw allow 30000/udp
+sudo ufw allow 30001/udp
+sudo ufw allow 30002/udp
+sudo ufw allow 30003/udp
+sudo ufw allow 30004/udp
+sudo ufw allow 30005/udp
+sudo ufw allow 30006/udp
+sudo ufw allow 30007/udp
+sudo ufw allow 30008/udp
+sudo ufw allow 30009/udp
 sudo ufw --force enable
 
 print_info "Firewall configured!"
