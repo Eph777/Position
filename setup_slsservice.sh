@@ -9,7 +9,6 @@ Description=Luanti Server (Port 30000 default)
 [Service]
 Type=simple
 User=${SERVICE_USER}
-WorkingDirectory=/snap/bin
 ExecStart=/snap/bin/luanti --server --world ~/snap/luanti/common/.minetest/worlds/$WORLD --gameid minetest_game --port 30000
 Restart=always
 
@@ -19,5 +18,7 @@ EOF
 
 
 sudo systemctl daemon-reload
+sudo systemctl enable luanti-server
+sudo systemctl start luanti-server
 sudo systemctl enable luanti-server
 sudo systemctl start luanti-server
