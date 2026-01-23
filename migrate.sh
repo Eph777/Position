@@ -77,13 +77,13 @@ safe_migrate() {
 
     # Logic: If success (0) OR if output contains the specific warning
     if [ $EXIT_CODE -eq 0 ]; then
-        echo "$NAME: Successfully migrated."
+        print_info "$NAME: Successfully migrated."
     elif echo "$OUTPUT" | grep -q "new backend is same as the old one"; then
-        echo "$NAME: Already on SQLite3. (Skipped)"
+        print_info "$NAME: Already on SQLite3. (Skipped)"
     else
         # If it failed for a real reason, show the error
-        echo "$NAME: Failed with error:"
-        echo "$OUTPUT"
+        print_error "$NAME: Failed with error:"
+        print_error "$OUTPUT"
     fi
 }
 

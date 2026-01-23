@@ -296,6 +296,8 @@ print_info "Step 9/9: Creating Luanti server start script..."
 
 cat > ${USER_HOME}/sls <<'EOF'
 #!/bin/bash
+# This script will setup the map hosting and then start the Luanti server
+~/luanti-qgis/setup_map_hosting.sh
 /snap/bin/luanti --server --world ~/snap/luanti/common/.minetest/worlds/myworld --gameid minetest_game --port 30000
 EOF
 
