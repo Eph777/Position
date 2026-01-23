@@ -28,7 +28,7 @@ print_info "=== Minetest Mapper Setup ==="
 # Step 1: Install dependencies
 print_info "Installing dependencies..."
 sudo apt update
-sudo apt install -y cmake libgd-dev zlib1g-dev libpng-dev libjpeg-dev libsqlite3-dev libpq-dev libhiredis-dev libleveldb-dev git build-essential
+sudo apt install -y cmake libgd-dev zlib1g-dev libpng-dev libjpeg-dev libsqlite3-dev libpq-dev libhiredis-dev libleveldb-dev libzstd-dev git build-essential
 
 # Verify cmake installed
 if ! command -v cmake &> /dev/null; then
