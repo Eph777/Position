@@ -1,13 +1,22 @@
 #!/bin/bash
 
 # Configuration
-USER_HOME=$(eval echo ~$SUDO_USER)
-if [ -z "$SUDO_USER" ]; then
-    USER_HOME="$HOME"
-fi
+SERVICE_USER=${SUDO_USER:-$(whoami)}
+USER_HOME=$(eval echo ~$SERVICE_USER)
 PROJECT_DIR="$USER_HOME/luanti-qgis"
 MAP_OUTPUT_DIR="$PROJECT_DIR/map_output"
 RENDER_SCRIPT="$PROJECT_DIR/render_map.sh"
+
+# Ensure directories exist and have correct permissions (fixes 200/CHDIR)
+if [ ! -d "$PROJECT_DIR" ]; then
+    echo "Creating project directory: $PROJECT_DIR"
+    mkdir -p "$PROJECT_DIR"
+fi
+mkdir -p "$MAP_OUTPUT_DIR"
+
+# Ensure the service user owns the directory so it can CHDIR into it
+echo "Setting permissions for $SERVICE_USER on $PROJECT_DIR..."
+chown -R "$SERVICE_USER:$SERVICE_USER" "$PROJECT_DIR"
 
 # Colors
 GREEN='\033[0;32m'
