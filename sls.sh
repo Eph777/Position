@@ -45,6 +45,10 @@ else
 fi
 
 PORT_IN_USE=$(sudo lsof -i :$PORT -t 2>/dev/null || true)
+IS_SERVICE=false
+if [[ "$3" == "--service" ]]; then
+    IS_SERVICE=true
+fi
 
 if [ ! -z "$PORT_IN_USE" ]; then
     print_warning "Port $PORT is already in use!"
@@ -52,17 +56,24 @@ if [ ! -z "$PORT_IN_USE" ]; then
     PROCESS_INFO=$(sudo lsof -i :$PORT | grep LISTEN)
     echo "$PROCESS_INFO"
     
-    echo ""
-    read -p "Do you want to kill this process and continue? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        print_info "Stopping process on port $PORT..."
+    if [ "$IS_SERVICE" = true ]; then
+        print_info "Running in service mode. Killing process on port $PORT automatically..."
         sudo kill -9 $PORT_IN_USE
         sleep 2
         print_info "Process stopped."
     else
-        print_error "Cannot proceed while port $PORT is in use. Exiting."
-        exit 1
+        echo ""
+        read -p "Do you want to kill this process and continue? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_info "Stopping process on port $PORT..."
+            sudo kill -9 $PORT_IN_USE
+            sleep 2
+            print_info "Process stopped."
+        else
+            print_error "Cannot proceed while port $PORT is in use. Exiting."
+            exit 1
+        fi
     fi
 fi
 
