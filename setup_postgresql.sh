@@ -87,7 +87,8 @@ print_info "PostgreSQL postgresql.conf file: $PG_CONF_FILE"
 sudo cp "$PG_HBA_CONF" "${PG_HBA_CONF}.backup"
 
 # Update pg_hba.conf to use scram-sha-256 authentication for local connections
-sudo sed -i 's/^local\s\+all\s\+all\s\+peer$/local   all             all                                     scram-sha-256/' "$PG_HBA_CONF"
+# Replace 'peer' or 'md5' with 'scram-sha-256'
+sudo sed -i 's/^local\s\+all\s\+all\s\+\(peer\|md5\).*/local   all             all                                     scram-sha-256/' "$PG_HBA_CONF"
 
 # Also allow remote connections (since we are enabling listen_addresses = '*')
 # CAUTION: This allows access from ANY IP. For production, restrict '0.0.0.0/0' to your specific subnet.
@@ -118,6 +119,9 @@ print_info "Creating database and user..."
 sudo systemctl stop luanti-tracker-postgresql || true
 
 sudo -u postgres psql <<EOF
+-- Ensure password is hashed with SCRAM-SHA-256 to match pg_hba.conf
+SET password_encryption = 'scram-sha-256';
+
 -- Force kill all active connections to the database to allow dropping
 SELECT pg_terminate_backend(pg_stat_activity.pid)
 FROM pg_stat_activity
