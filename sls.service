@@ -1,0 +1,12 @@
+[Unit]
+Description=Luanti Server
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root
+ExecStart=/root/sls.sh myworld 30000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
