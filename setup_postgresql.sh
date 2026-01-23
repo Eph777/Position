@@ -78,15 +78,35 @@ print_info "Step 4/9: Configuring PostgreSQL..."
 # Configure authentication method
 print_info "Configuring PostgreSQL authentication..."
 PG_HBA_CONF=$(sudo -u postgres psql -t -P format=unaligned -c 'SHOW hba_file;')
-print_info "PostgreSQL config file: $PG_HBA_CONF"
+PG_HBA_CONF=$(sudo -u postgres psql -t -P format=unaligned -c 'SHOW hba_file;')
+PG_CONF_FILE=$(sudo -u postgres psql -t -P format=unaligned -c 'SHOW config_file;')
+print_info "PostgreSQL pg_hba.conf file: $PG_HBA_CONF"
+print_info "PostgreSQL postgresql.conf file: $PG_CONF_FILE"
 
 # Backup original pg_hba.conf
 sudo cp "$PG_HBA_CONF" "${PG_HBA_CONF}.backup"
 
-# Update pg_hba.conf to use md5 authentication for local connections
-sudo sed -i 's/^local\s\+all\s\+all\s\+peer$/local   all             all                                     md5/' "$PG_HBA_CONF"
+# Update pg_hba.conf to use scram-sha-256 authentication for local connections
+sudo sed -i 's/^local\s\+all\s\+all\s\+peer$/local   all             all                                     scram-sha-256/' "$PG_HBA_CONF"
+
+# Also allow remote connections (since we are enabling listen_addresses = '*')
+# CAUTION: This allows access from ANY IP. For production, restrict '0.0.0.0/0' to your specific subnet.
+if ! grep -q "host    all             all             0.0.0.0/0               scram-sha-256" "$PG_HBA_CONF"; then
+    echo "host    all             all             0.0.0.0/0               scram-sha-256" | sudo tee -a "$PG_HBA_CONF"
+fi
+
+# Configure postgresql.conf to listen on all addresses
+print_info "Configuring postgresql.conf to listen on all addresses..."
+sudo cp "$PG_CONF_FILE" "${PG_CONF_FILE}.backup"
+# Check if listen_addresses is already set, if so replace it, otherwise append it
+if grep -q "^listen_addresses" "$PG_CONF_FILE"; then
+    sudo sed -i "s/^listen_addresses = .*/listen_addresses = '*'/" "$PG_CONF_FILE"
+else
+    echo "listen_addresses = '*'" | sudo tee -a "$PG_CONF_FILE"
+fi
 
 # Reload PostgreSQL to apply changes
+sudo systemctl restart postgresql
 sudo systemctl reload postgresql
 
 print_info "PostgreSQL authentication configured!"
