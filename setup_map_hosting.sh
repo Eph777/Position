@@ -32,6 +32,7 @@ chmod +x "$PROJECT_DIR/auto_render_loop.sh"
 
 # 3. Create Map Renderer Service
 echo "Creating luanti-map-render.service..."
+SERVICE_USER=${SUDO_USER:-$(whoami)}
 sudo tee /etc/systemd/system/luanti-map-render.service > /dev/null <<EOF
 [Unit]
 Description=Luanti Map Auto-Renderer (15s Interval)
@@ -39,9 +40,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=$(whoami)
+User=${SERVICE_USER}
 WorkingDirectory=$PROJECT_DIR
-ExecStart=$PROJECT_DIR/auto_render_loop.sh
+ExecStart=/bin/bash $PROJECT_DIR/auto_render_loop.sh
 Restart=always
 
 [Install]
@@ -57,7 +58,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=$(whoami)
+User=${SERVICE_USER}
 WorkingDirectory=$MAP_OUTPUT_DIR
 # Use our custom Python script that supports Range requests (No external dependencies needed!)
 ExecStart=/usr/bin/python3 $PROJECT_DIR/range_server.py 8080
