@@ -45,7 +45,6 @@ SERVICE_USER=${SUDO_USER:-$(whoami)}
 sudo tee /etc/systemd/system/luanti-map-render.service > /dev/null <<EOF
 [Unit]
 Description=Luanti Map Auto-Renderer (15s Interval)
-After=network.target
 
 [Service]
 Type=simple
@@ -63,7 +62,6 @@ echo "Creating luanti-map-server.service..."
 sudo tee /etc/systemd/system/luanti-map-server.service > /dev/null <<EOF
 [Unit]
 Description=Luanti Map HTTP Server (Port 8080)
-After=network.target
 
 [Service]
 Type=simple
