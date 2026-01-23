@@ -21,7 +21,7 @@ echo "Rendering map..."
 TEMP_IMAGE="$OUTPUT_DIR/map_temp.png"
 
 # Render to temp file first (Atomic update)
-$MAPPER_EXE --input "$WORLD_PATH" --output "$TEMP_IMAGE" --bgcolor "#00ffffff" --colors "$COLORS_FILE" --geometry -5000:-5000+10000+10000
+$MAPPER_EXE --input "$WORLD_PATH" --output "$TEMP_IMAGE" --bgcolor "#ffffff" --colors "$COLORS_FILE" --geometry -5000:-5000+10000+10000
 
 if [ $? -eq 0 ]; then
     # Atomically move temp file to final file
