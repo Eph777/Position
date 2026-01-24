@@ -8,8 +8,13 @@ DB_USER="$3"
 DB_PASS="$4"
 DB_NAME="$5"
 
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCHEMA_FILE="$PROJECT_DIR/scripts/schema.sql"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/schema.sql" ]; then
+    SCHEMA_FILE="$SCRIPT_DIR/schema.sql"
+else
+    PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+    SCHEMA_FILE="$PROJECT_DIR/scripts/schema.sql"
+fi
 
 # Explicit Paths for User Environment
 PG_BIN="/usr/lib/postgresql/16/bin"
