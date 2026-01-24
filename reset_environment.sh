@@ -37,9 +37,14 @@ done
 sudo systemctl stop luanti-tracker-postgresql 2>/dev/null
 sudo systemctl stop luanti-map-render 2>/dev/null
 sudo systemctl stop luanti-map-server 2>/dev/null
+sudo systemctl stop luanti-server@* 2>/dev/null
 sudo systemctl disable luanti-tracker-postgresql 2>/dev/null
 sudo systemctl disable luanti-map-render 2>/dev/null
 sudo systemctl disable luanti-map-server 2>/dev/null
+sudo systemctl disable luanti-server@* 2>/dev/null
+
+pkill -f luanti
+pkill -f python3
 
 echo -e "${GREEN}[INFO] Removing systemd service files...${NC}"
 sudo rm /etc/systemd/system/luanti-server@*.service 2>/dev/null
