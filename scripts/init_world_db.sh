@@ -8,7 +8,8 @@ DB_USER="$3"
 DB_PASS="$4"
 DB_NAME="$5"
 
-SCHEMA_FILE="schema.sql"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCHEMA_FILE="$PROJECT_DIR/scripts/schema.sql"
 
 # Explicit Paths for User Environment
 PG_BIN="/usr/lib/postgresql/12/bin"
