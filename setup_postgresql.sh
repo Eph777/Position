@@ -160,9 +160,9 @@ cd "$PROJECT_DIR"
 
 # Install dependencies
 print_info "Installing Python dependencies (Global)..."
-pip install --upgrade pip --break-system-packages
-pip install -r requirements.txt --break-system-packages
-pip install fastapi uvicorn asyncpg bcrypt python-multipart --break-system-packages
+pip install --upgrade pip #break-system-packages
+pip install -r requirements.txt #break-system-packages
+pip install fastapi uvicorn asyncpg bcrypt python-multipart #break-system-packages
 
 # Create .env file
 print_info "Creating .env configuration file..."
