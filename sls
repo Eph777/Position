@@ -124,10 +124,28 @@ export DB_PASS="$DB_PASS"
 # Note: server_fastapi.py must be in python path or current dir
 (
     cd "$PROJECT_DIR"
-    # source venv/bin/activate  <-- Removed
-    uvicorn server_fastapi:app --host 0.0.0.0 --port $API_PORT
+    # Use python3 -m uvicorn to ensure using the installed module even if bin not in PATH
+    python3 -m uvicorn server_fastapi:app --host 0.0.0.0 --port $API_PORT
 ) > "$LOG_DIR/api.log" 2>&1 &
-PIDS="$PIDS $!"
+API_PID=$!
+PIDS="$PIDS $API_PID"
+
+echo "Waiting for Middleware to start..."
+# Wait loop
+for i in {1..10}; do
+    if ! ps -p $API_PID > /dev/null; then
+        echo "Error: Middleware process died!"
+        cat "$LOG_DIR/api.log"
+        cleanup
+        exit 1
+    fi
+    # Check if port is open (using lsof or netcat or bash tcp)
+    if bash -c "</dev/tcp/localhost/$API_PORT" &>/dev/null; then
+        echo "Middleware is up!"
+        break
+    fi
+    sleep 1
+done
 
 
 # --- 5. Start Map System ---
