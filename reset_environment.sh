@@ -1,4 +1,9 @@
 #!/bin/bash
+# Author: Ephraim BOURIAHI
+# Date: 2025-01-24
+
+# Luanti Position Tracker - Reset Environment Script
+# This script will reset the environment by removing all data, services, and virtual environments
 
 # Configuration
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
