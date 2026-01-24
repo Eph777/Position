@@ -46,7 +46,7 @@ CREATE POLICY team_isolation_policy ON players
 -- However, for RLS to apply to the view user, it normally works if the view is just a simple selection.
 -- We will rely on the user having SELECT permission on the table OR strict RLS on the table.
 -- Best practice: Give SELECT on the View, and the View queries the Table using the invoker's rights.
-CREATE OR REPLACE VIEW v_tactical_map AS
+CREATE OR REPLACE VIEW v_tactical_map WITH (security_invoker = true) AS
 SELECT
     player_name,
     team_name,
