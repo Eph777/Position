@@ -108,9 +108,26 @@ fi
 
 # Start Postgres
 echo "Starting PostgreSQL on port $DB_PORT..."
-pg_ctl -D "$DB_DATA_DIR" -o "-p $DB_PORT" -l "$LOG_DIR/postgres.log" start
-# Wait for it
-sleep 2
+# -w waits for startup to complete
+"$PG_BIN/pg_ctl" -D "$DB_DATA_DIR" -o "-p $DB_PORT" -l "$LOG_DIR/postgres.log" start -w
+
+# Verify readiness
+echo "Waiting for Database to accept connections..."
+MAX_RETRIES=20
+for i in $(seq 1 $MAX_RETRIES); do
+    if "$PG_BIN/pg_isready" -h localhost -p "$DB_PORT" >/dev/null 2>&1; then
+        echo "Database is ready."
+        break
+    fi
+    if [ "$i" -eq "$MAX_RETRIES" ]; then
+        echo "Error: Database failed to start or is not responding."
+        echo "--- Last 20 lines of postgres.log ---"
+        tail -n 20 "$LOG_DIR/postgres.log"
+        cleanup
+        exit 1
+    fi
+    sleep 1
+done
 
 # --- 4. Start Middleware ---
 echo "Starting Middleware on port $API_PORT..."
