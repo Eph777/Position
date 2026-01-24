@@ -158,16 +158,11 @@ fi
 
 cd "$PROJECT_DIR"
 
-# Create virtual environment
-print_info "Creating Python virtual environment..."
-$PYTHON_VERSION -m venv venv
-source venv/bin/activate
-
 # Install dependencies
-print_info "Installing Python dependencies..."
-pip install --upgrade pip
-pip install -r requirements.txt
-pip install fastapi uvicorn asyncpg bcrypt python-multipart # Ensure these are installed
+print_info "Installing Python dependencies (Global)..."
+pip install --upgrade pip --break-system-packages
+pip install -r requirements.txt --break-system-packages
+pip install fastapi uvicorn asyncpg bcrypt python-multipart --break-system-packages
 
 # Create .env file
 print_info "Creating .env configuration file..."

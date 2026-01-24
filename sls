@@ -120,7 +120,7 @@ export DB_PASS="$DB_PASS"
 # Note: server_fastapi.py must be in python path or current dir
 (
     cd "$PROJECT_DIR"
-    source venv/bin/activate
+    # source venv/bin/activate  <-- Removed
     uvicorn server_fastapi:app --host 0.0.0.0 --port $API_PORT
 ) > "$LOG_DIR/api.log" 2>&1 &
 PIDS="$PIDS $!"
