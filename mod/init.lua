@@ -1,5 +1,6 @@
 -- Configuration
-local SERVER_BASE_URL = "http://localhost:5000"
+local conf_url = minetest.settings:get("position_tracker.url")
+local SERVER_BASE_URL = conf_url or "http://localhost:5000"
 local API_JOIN = SERVER_BASE_URL .. "/api/join"
 local API_SYNC = SERVER_BASE_URL .. "/sync/player"
 

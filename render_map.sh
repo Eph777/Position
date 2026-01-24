@@ -1,12 +1,19 @@
 #!/bin/bash
 
 WORLD="$1"
+CUSTOM_OUTPUT="$2"
 
 # Configuration
 MAPPER_EXE="$HOME/minetest-mapper/minetestmapper"
 COLORS_FILE="$HOME/minetest-mapper/colors.txt"
 WORLD_PATH="$HOME/snap/luanti/common/.minetest/worlds/$WORLD"
-OUTPUT_DIR="$HOME/luanti-qgis/map_output"
+
+if [ -z "$CUSTOM_OUTPUT" ]; then
+    OUTPUT_DIR="$HOME/luanti-qgis/map_output"
+else
+    OUTPUT_DIR="$CUSTOM_OUTPUT"
+fi
+
 OUTPUT_IMAGE="$OUTPUT_DIR/map.png"
 OUTPUT_WORLD_FILE="$OUTPUT_DIR/map.pgw"
 
