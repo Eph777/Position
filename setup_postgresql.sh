@@ -130,7 +130,7 @@ WHERE pg_stat_activity.datname = '${DB_NAME}'
 
 DROP DATABASE IF EXISTS ${DB_NAME};
 DROP USER IF EXISTS ${DB_USER};
-CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';
+CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}' CREATEROLE;
 CREATE DATABASE ${DB_NAME};
 GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};
 \c ${DB_NAME}
@@ -167,6 +167,7 @@ source venv/bin/activate
 print_info "Installing Python dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
+pip install fastapi uvicorn asyncpg bcrypt python-multipart # Ensure these are installed
 
 # Create .env file
 print_info "Creating .env configuration file..."
@@ -281,7 +282,7 @@ User=${CURRENT_USER}
 WorkingDirectory=$PROJECT_DIR
 Environment="PATH=$PROJECT_DIR/venv/bin"
 EnvironmentFile=$PROJECT_DIR/.env
-ExecStart=$PROJECT_DIR/venv/bin/python3 $PROJECT_DIR/server.py
+ExecStart=$PROJECT_DIR/venv/bin/uvicorn server_fastapi:app --host 0.0.0.0 --port 5000
 Restart=always
 RestartSec=10
 

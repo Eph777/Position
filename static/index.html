@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luanti Tactical Team Manager</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f0f0f0; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h1, h2 { color: #333; }
+        input { padding: 8px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        button { padding: 10px 15px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        button.delete { background: #dc3545; }
+        button.delete:hover { background: #a71d2a; }
+        .hidden { display: none; }
+        .player-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
+        .status-pending { color: orange; font-weight: bold; }
+        .status-active { color: green; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>Luanti Tactical Command</h1>
+
+    <!-- Create Team Section -->
+    <div class="card" id="create-section">
+        <h2>Create New Team</h2>
+        <input type="text" id="new-team-name" placeholder="Team Name (e.g. Alpha)">
+        <input type="password" id="new-team-pass" placeholder="Password">
+        <button onclick="createTeam()">Create Team</button>
+    </div>
+
+    <!-- Login Section -->
+    <div class="card" id="login-section">
+        <h2>Team Leader Login</h2>
+        <input type="text" id="login-name" placeholder="Team Name">
+        <input type="password" id="login-pass" placeholder="Password">
+        <button onclick="login()">Access Dashboard</button>
+    </div>
+
+    <!-- Dashboard Section -->
+    <div class="card hidden" id="dashboard-section">
+        <div style="display:flex; justify-content:space-between;">
+            <h2 id="team-title">Team Dashboard</h2>
+            <button onclick="logout()" style="background:#666;">Logout</button>
+        </div>
+        
+        <h3>Pending Requests</h3>
+        <div id="pending-list">
+            <p>Loading...</p>
+        </div>
+
+        <h3>Active Roster</h3>
+        <div id="active-list">
+            <p>Loading...</p>
+        </div>
+
+        <hr>
+        <h3>Danger Zone</h3>
+        <button class="delete" onclick="deleteTeam()">Delete Team</button>
+    </div>
+
+    <script>
+        let currentTeam = null;
+        let currentPass = null;
+
+        async function api(endpoint, method = 'GET', body = null) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (currentTeam && currentPass) {
+                headers['X-Team-Name'] = currentTeam;
+                headers['X-Team-Pass'] = currentPass;
+            }
+            const opts = { method, headers };
+            if (body) opts.body = JSON.stringify(body);
+            
+            const res = await fetch(endpoint, opts);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Request failed');
+            return data;
+        }
+
+        async function createTeam() {
+            const name = document.getElementById('new-team-name').value;
+            const password = document.getElementById('new-team-pass').value;
+            if (!name || !password) return alert('Fill all fields');
+
+            try {
+                await api('/api/team', 'POST', { name, password });
+                alert('Team created! You can now login.');
+                document.getElementById('new-team-name').value = '';
+                document.getElementById('new-team-pass').value = '';
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function login() {
+            const name = document.getElementById('login-name').value;
+            const password = document.getElementById('login-pass').value;
+            if (!name || !password) return alert('Fill all fields');
+
+            // Verify credentials by fetching roster (if we can fetch, we are logged in)
+            currentTeam = name;
+            currentPass = password;
+
+            try {
+                await loadDashboard();
+                document.getElementById('create-section').classList.add('hidden');
+                document.getElementById('login-section').classList.add('hidden');
+                document.getElementById('dashboard-section').classList.remove('hidden');
+                document.getElementById('team-title').innerText = `Team ${name}`;
+            } catch (e) {
+                alert('Login failed: ' + e.message);
+                currentTeam = null;
+                currentPass = null;
+            }
+        }
+
+        function logout() {
+            currentTeam = null;
+            currentPass = null;
+            location.reload();
+        }
+
+        async function loadDashboard() {
+            const pending = await api('/api/team/requests');
+            const active = await api('/api/team/roster');
+
+            renderList('pending-list', pending.players, true);
+            renderList('active-list', active.players, false);
+        }
+
+        function renderList(elementId, players, isPending) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = '';
+            if (!players || players.length === 0) {
+                container.innerHTML = '<p>No players found.</p>';
+                return;
+            }
+
+            players.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'player-row';
+                div.innerHTML = `
+                    <span><strong>${p.name}</strong> <small>(${p.last_update})</small></span>
+                    ${isPending ? `<button onclick="approve('${p.name}')">Approve</button>` : '<span class="status-active">Active</span>'}
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        async function approve(playerName) {
+            if (!confirm(`Approve ${playerName}?`)) return;
+            try {
+                await api('/api/team/approve', 'POST', { player_name: playerName });
+                loadDashboard();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        async function deleteTeam() {
+            if (!confirm('Are you sure? This will delete the team and all data. Cannot be undone.')) return;
+            const pass = prompt("Confirm Password to delete:");
+            if (pass !== currentPass) return alert("Incorrect password");
+
+            try {
+                await api(`/api/team/${currentTeam}`, 'DELETE');
+                alert('Team deleted.');
+                logout();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,34 +1,62 @@
--- PostgreSQL Schema for Luanti Player Position Tracker
--- This schema stores player position traces with timestamps
+-- PostgreSQL Schema for Luanti Tactical Team Management System
+-- Enable PostGIS for spatial operations
+CREATE EXTENSION IF NOT EXISTS postgis;
 
-CREATE TABLE IF NOT EXISTS player_traces (
-    id SERIAL PRIMARY KEY,
-    player_name VARCHAR(100) NOT NULL,
+-- Table: Teams (Metadata)
+CREATE TABLE IF NOT EXISTS teams (
+    name VARCHAR(100) PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table: Players
+-- Stores player position, inventory, and team affiliation
+CREATE TABLE IF NOT EXISTS players (
+    player_name VARCHAR(100) PRIMARY KEY,
+    team_name VARCHAR(100) REFERENCES teams(name) ON DELETE CASCADE,
     x DOUBLE PRECISION NOT NULL,
     y DOUBLE PRECISION NOT NULL,
     z DOUBLE PRECISION NOT NULL,
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    inventory_json JSONB DEFAULT '{}'::jsonb,
+    status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'active'
+    last_update TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Constraint: team_name must NOT be null (every player must try to join a team)
+    CONSTRAINT fk_team FOREIGN KEY (team_name) REFERENCES teams(name)
 );
 
-CREATE TABLE IF NOT EXISTS player_traces_archive (
-    id SERIAL PRIMARY KEY,
-    player_name VARCHAR(100) NOT NULL,
-    x DOUBLE PRECISION NOT NULL,
-    y DOUBLE PRECISION NOT NULL,
-    z DOUBLE PRECISION NOT NULL,
-    timestamp TIMESTAMP WITH TIME ZONE,
-    archived_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+-- Indices for performance
+CREATE INDEX IF NOT EXISTS idx_players_team ON players(team_name);
+CREATE INDEX IF NOT EXISTS idx_players_status ON players(status);
 
--- Index on player_name and timestamp for faster querying of traces for specific players
-CREATE INDEX IF NOT EXISTS idx_player_traces_archive_name_time ON player_traces_archive(player_name, timestamp);
+-- Enable Row-Level Security (RLS)
+ALTER TABLE players ENABLE ROW LEVEL SECURITY;
 
--- Create optimized view for QGIS live tracking (latest position per player)
--- This view allows QGIS to see the latest position of each active player as a spatial layer
-CREATE OR REPLACE VIEW view_live_positions AS
-SELECT DISTINCT ON (player_name) 
-    id, player_name, x, y, z, timestamp,
-    ST_SetSRID(ST_MakePoint(x, z), 0) AS geom
-FROM player_traces
-WHERE timestamp > NOW() - INTERVAL '1 seconds'
-ORDER BY player_name, timestamp DESC;
+-- RLS Policy: Team Isolation
+-- A user can only SEE rows where team_name matches their database username.
+-- Note: 'current_user' returns the name of the database user.
+-- The Table Owner (middleware user) bypasses this by default.
+CREATE POLICY team_isolation_policy ON players
+    FOR SELECT
+    USING (team_name = current_user);
+
+-- PostGIS View: v_tactical_map
+-- Projects player positions to Geometry for QGIS visualization.
+-- This view effectively inherits RLS from the underlying 'players' table
+-- because Views in Postgres (unless defined with security_barrier) check underlying permissions.
+-- However, for RLS to apply to the view user, it normally works if the view is just a simple selection.
+-- We will rely on the user having SELECT permission on the table OR strict RLS on the table.
+-- Best practice: Give SELECT on the View, and the View queries the Table using the invoker's rights.
+CREATE OR REPLACE VIEW v_tactical_map AS
+SELECT
+    player_name,
+    team_name,
+    status,
+    last_update,
+    inventory_json,
+    -- Create 2D Point (X, Z) - assuming Y is elevation
+    ST_SetSRID(ST_MakePoint(x, z), 4326) AS geom
+FROM players
+WHERE status = 'active'; -- Only show active players on the map
+
+-- Grant usage on schemas and defaults
+-- (Specific grants for team users will be handled by Middleware)
