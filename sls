@@ -16,7 +16,7 @@ DB_DATA_DIR="$WORLDS_DATA_DIR/db"
 LOG_DIR="$WORLDS_DATA_DIR/logs"
 WORLD_PATH="$HOME/snap/luanti/common/.minetest/worlds/$WORLD"
 
-# PostgreSQL Binaries Path (Adjusted for User's System)
+# PostgreSQL Explicit Path
 PG_BIN="/usr/lib/postgresql/12/bin"
 export PATH="$PG_BIN:$PATH"
 
@@ -63,8 +63,7 @@ else
 fi
 echo "DB Port: $DB_PORT"
 
-# Middleware Port (Internal, also needs finding)
-# We assume we always need to find a free one, or default to 5000+
+# Middleware Port
 echo "Finding free Middleware Port (starting 5000)..."
 API_PORT=$(find_free_port 5000)
 echo "API Port: $API_PORT"
@@ -83,9 +82,8 @@ cleanup() {
         fi
     done
     
-    # Stop Postgres explicitly if needed (pg_ctl)
     echo "Stopping Database..."
-    pg_ctl -D "$DB_DATA_DIR" stop -m fast > /dev/null 2>&1
+    "$PG_BIN/pg_ctl" -D "$DB_DATA_DIR" stop -m fast > /dev/null 2>&1
     
     echo "Cleanup complete."
     exit 0
@@ -96,33 +94,36 @@ trap cleanup SIGINT SIGTERM
 echo "--- Starting Services ---"
 
 DB_USER="$WORLD"
-DB_PASS="pass_$WORLD" # Simple deterministic password for isolation
+DB_PASS="pass_$WORLD"
 DB_NAME="luanti_db"
 
-# Initialize if needed
+# Initialize
 if [ ! -d "$DB_DATA_DIR" ]; then
-    echo "Initializing new database cluster for '$WORLD'..."
+    echo "Initializing new database cluster..."
     chmod +x "$PROJECT_DIR/scripts/init_world_db.sh"
     "$PROJECT_DIR/scripts/init_world_db.sh" "$DB_DATA_DIR" "$DB_PORT" "$DB_USER" "$DB_PASS" "$DB_NAME"
+    if [ $? -ne 0 ]; then
+        echo "Error: Database initialization failed."
+        exit 1
+    fi
 fi
 
 # Start Postgres
 echo "Starting PostgreSQL on port $DB_PORT..."
-# -w waits for startup to complete
 "$PG_BIN/pg_ctl" -D "$DB_DATA_DIR" -o "-p $DB_PORT" -l "$LOG_DIR/postgres.log" start -w
 
-# Verify readiness
-echo "Waiting for Database to accept connections..."
-MAX_RETRIES=20
+# Wait for DB to be responsive
+echo "Waiting for Database readiness..."
+MAX_RETRIES=15
 for i in $(seq 1 $MAX_RETRIES); do
     if "$PG_BIN/pg_isready" -h localhost -p "$DB_PORT" >/dev/null 2>&1; then
-        echo "Database is ready."
+        echo "Database Ready."
         break
     fi
     if [ "$i" -eq "$MAX_RETRIES" ]; then
-        echo "Error: Database failed to start or is not responding."
-        echo "--- Last 20 lines of postgres.log ---"
-        tail -n 20 "$LOG_DIR/postgres.log"
+        echo "Error: Database failed to start."
+        echo "LOGS:"
+        tail -n 10 "$LOG_DIR/postgres.log"
         cleanup
         exit 1
     fi
@@ -134,31 +135,29 @@ echo "Starting Middleware on port $API_PORT..."
 export DB_HOST="localhost"
 export DB_PORT="$DB_PORT"
 export DB_NAME="$DB_NAME"
-export DB_USER="$DB_USER" # The middleware connects as the 'superuser' for this instance (owner)
+export DB_USER="$DB_USER"
 export DB_PASS="$DB_PASS"
 
-# We use uvicorn directly
-# Note: server_fastapi.py must be in python path or current dir
 (
     cd "$PROJECT_DIR"
-    # Use python3 -m uvicorn to ensure using the installed module even if bin not in PATH
+    # Run global uvicorn
     python3 -m uvicorn server_fastapi:app --host 0.0.0.0 --port $API_PORT
 ) > "$LOG_DIR/api.log" 2>&1 &
 API_PID=$!
 PIDS="$PIDS $API_PID"
 
-echo "Waiting for Middleware to start..."
-# Wait loop
+# Wait for API
+echo "Waiting for Middleware..."
 for i in {1..10}; do
     if ! ps -p $API_PID > /dev/null; then
-        echo "Error: Middleware process died!"
+        echo "Error: Middleware crashed."
         cat "$LOG_DIR/api.log"
         cleanup
         exit 1
     fi
-    # Check if port is open (using lsof or netcat or bash tcp)
-    if bash -c "</dev/tcp/localhost/$API_PORT" &>/dev/null; then
-        echo "Middleware is up!"
+    # Simple check if port is open using python oneliner because netcat might check TCP connect
+    if python3 -c "import socket; s=socket.socket(); s.connect(('localhost', $API_PORT))" >/dev/null 2>&1; then
+        echo "Middleware Ready."
         break
     fi
     sleep 1
@@ -169,12 +168,9 @@ done
 echo "Starting Map System on port $MAP_PORT..."
 
 # Renderer
-chmod +x "$PROJECT_DIR/auto_render_loop.sh"
-# Check if map output dir exists in world path? 
-# User wanted "own map page". 
-# auto_render_loop.sh expects WORLD as arg1, OUTPUT as arg2
 MAP_OUTPUT="$WORLD_PATH/map_output"
 mkdir -p "$MAP_OUTPUT"
+chmod +x "$PROJECT_DIR/auto_render_loop.sh"
 
 "$PROJECT_DIR/auto_render_loop.sh" "$WORLD" "$MAP_OUTPUT" > "$LOG_DIR/map_render.log" 2>&1 &
 PIDS="$PIDS $!"
@@ -188,44 +184,26 @@ PIDS="$PIDS $!"
 
 
 # --- 6. Start Game ---
-echo "--- Starting Game ---"
-echo "Game: Port $GAME_PORT"
-echo "Map: http://localhost:$MAP_PORT/map.png"
-echo "Web Interface: http://localhost:$API_PORT"
-echo "Logging to: $LOG_DIR"
-echo "Press Ctrl+C to stop."
+echo "--- Session Active ---"
+echo "Game Port: $GAME_PORT"
+echo "Web Manager: http://localhost:$API_PORT"
+echo "Live Map: http://localhost:$MAP_PORT/map.png"
+echo "Ctrl+C to stop."
 
-# Ensure World Config
-if [ ! -f "$WORLD_PATH/world.mt" ]; then
-    echo "Creating world config..."
-    echo "gameid = minetest_game" > "$WORLD_PATH/world.mt"
-    echo "backend = sqlite3" >> "$WORLD_PATH/world.mt"
-    echo "load_mod_position_tracker = true" >> "$WORLD_PATH/world.mt"
-else
-    # Ensure mod enabled
-    grep -q "load_mod_position_tracker" "$WORLD_PATH/world.mt" || echo "load_mod_position_tracker = true" >> "$WORLD_PATH/world.mt"
-fi
-
-# Start Luanti
-# Config Generation for this session
+# Config Generation
 SESSION_CONF="$WORLDS_DATA_DIR/minetest.conf"
 SYSTEM_CONF="$HOME/snap/luanti/common/.minetest/minetest.conf"
 
-echo "Generating session config: $SESSION_CONF"
-# Start fresh or copy system? For total isolation, let's include system but override.
 if [ -f "$SYSTEM_CONF" ]; then
     cat "$SYSTEM_CONF" > "$SESSION_CONF"
 else
     echo "# Base config" > "$SESSION_CONF"
 fi
 
-# Append dynamic settings
 echo "" >> "$SESSION_CONF"
-echo "# Dynamic Session Settings" >> "$SESSION_CONF"
 echo "secure.http_mods = position_tracker" >> "$SESSION_CONF"
 echo "position_tracker.url = http://localhost:$API_PORT" >> "$SESSION_CONF"
 
-# Start Luanti
 /snap/bin/luanti --server --world "$WORLD_PATH" --gameid minetest_game --port $GAME_PORT --config "$SESSION_CONF"
 
 cleanup

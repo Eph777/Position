@@ -44,13 +44,25 @@ class ApproveRequest(BaseModel):
 # Database Connection
 async def get_db_pool():
     # Only creating a pool for the middleware user
-    return await asyncpg.create_pool(
-        user=DB_USER,
-        password=DB_PASS,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    retries = 10
+    for i in range(retries):
+        try:
+            pool = await asyncpg.create_pool(
+                user=DB_USER,
+                password=DB_PASS,
+                database=DB_NAME,
+                host=DB_HOST,
+                port=DB_PORT
+            )
+            logger.info("Connected to Database.")
+            return pool
+        except (OSError, asyncpg.CannotConnectNowError, asyncpg.PostgresConnectionError) as e:
+            if i == retries - 1:
+                logger.error(f"Failed to connect to DB after {retries} attempts: {e}")
+                raise e
+            logger.warning(f"DB not ready yet, retrying in 1s ({i+1}/{retries})...")
+            import asyncio
+            await asyncio.sleep(1)
 
 @app.on_event("startup")
 async def startup():
