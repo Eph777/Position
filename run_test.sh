@@ -5,6 +5,10 @@ WORLD="${1:-testworld}"
 GAME_PORT="${2:-30001}"
 MAP_PORT="${3:-8081}"
 
+# ensures port is open
+sudo ufw allow "$MAP_PORT"/tcp
+sudo ufw allow "$GAME_PORT"/tcp 
+
 SERVICE_USER=${SUDO_USER:-$(whoami)}
 USER_HOME=$(eval echo ~$SERVICE_USER)
 PROJECT_DIR="$USER_HOME/luanti-qgis"
