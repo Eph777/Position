@@ -14,7 +14,7 @@ print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-./setup_postgresql.sh
+./setup.sh
 ./migrate.sh $WORLD
 ./setup_mapper.sh $WORLD
 
