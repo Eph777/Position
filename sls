@@ -168,7 +168,25 @@ else
 fi
 
 # Start Luanti
-# We inject the API URL setting via --set
-/snap/bin/luanti --server --world "$WORLD_PATH" --gameid minetest_game --port $GAME_PORT --set position_tracker.url="http://localhost:$API_PORT"
+# Config Generation for this session
+SESSION_CONF="$WORLDS_DATA_DIR/minetest.conf"
+SYSTEM_CONF="$HOME/snap/luanti/common/.minetest/minetest.conf"
+
+echo "Generating session config: $SESSION_CONF"
+# Start fresh or copy system? For total isolation, let's include system but override.
+if [ -f "$SYSTEM_CONF" ]; then
+    cat "$SYSTEM_CONF" > "$SESSION_CONF"
+else
+    echo "# Base config" > "$SESSION_CONF"
+fi
+
+# Append dynamic settings
+echo "" >> "$SESSION_CONF"
+echo "# Dynamic Session Settings" >> "$SESSION_CONF"
+echo "secure.http_mods = position_tracker" >> "$SESSION_CONF"
+echo "position_tracker.url = http://localhost:$API_PORT" >> "$SESSION_CONF"
+
+# Start Luanti
+/snap/bin/luanti --server --world "$WORLD_PATH" --gameid minetest_game --port $GAME_PORT --config "$SESSION_CONF"
 
 cleanup
