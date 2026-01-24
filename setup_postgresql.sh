@@ -269,33 +269,10 @@ if [ ! -z "$PORT_IN_USE" ]; then
     fi
 fi
 
-print_info "Creating systemd service..."
-
-sudo tee /etc/systemd/system/luanti-tracker-postgresql.service > /dev/null <<EOF
-[Unit]
-Description=Luanti Player Position Tracker (PostgreSQL)
-After=network.target postgresql.service
-
-[Service]
-Type=simple
-User=${CURRENT_USER}
-WorkingDirectory=$PROJECT_DIR
-Environment="PATH=$PROJECT_DIR/venv/bin"
-EnvironmentFile=$PROJECT_DIR/.env
-ExecStart=$PROJECT_DIR/venv/bin/uvicorn server_fastapi:app --host 0.0.0.0 --port 5000
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Enable and start service
-sudo systemctl daemon-reload
-sudo systemctl enable luanti-tracker-postgresql
-sudo systemctl start luanti-tracker-postgresql
-
-print_info "Systemd service created and started!"
+# Systemd Service No Longer Used
+# We now use the unified 'sls' session launcher.
+print_info "Skipping systemd service creation (Architecture change)."
+print_info "Use './sls <world>' to start the server."
 
 # Step 8: Configure firewall
 print_info "Step 8/9: Configuring firewall..."

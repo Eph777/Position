@@ -7,7 +7,7 @@ MAP_PORT="${3:-8081}"
 
 # ensures port is open
 sudo ufw allow "$MAP_PORT"/tcp
-sudo ufw allow "$GAME_PORT"/tcp 
+sudo ufw allow "$GAME_PORT"/udp 
 
 SERVICE_USER=${SUDO_USER:-$(whoami)}
 USER_HOME=$(eval echo ~$SERVICE_USER)
