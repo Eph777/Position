@@ -10,6 +10,10 @@ DB_NAME="$5"
 
 SCHEMA_FILE="schema.sql" # Assuming run from project root or path provided
 
+# PostgreSQL Binaries Path
+PG_BIN="/usr/lib/postgresql/12/bin"
+export PATH="$PG_BIN:$PATH"
+
 if [ -d "$DATA_DIR" ]; then
     echo "[DB Init] Data directory $DATA_DIR exists. Skipping initdb."
     exit 0
@@ -19,13 +23,10 @@ echo "[DB Init] Initializing database in $DATA_DIR..."
 mkdir -p "$DATA_DIR"
 
 # 1. Init DB
-# Using 'auth-local=trust' for simplicity within the session context? 
-# Or md5/scram-sha-256? Let's use scram-sha-256 but trust local socket connections for the 'postgres' user to setup?
-# We need to be careful. Let's use standard -A directory approach.
-/usr/lib/postgresql/16/bin/initdb -D "$DATA_DIR" --auth-local=trust --no-instructions > /dev/null 2>&1
-# Try standard path if specific version fails (or rely on PATH)
+"$PG_BIN/initdb" -D "$DATA_DIR" --auth-local=trust --no-instructions > /dev/null 2>&1
 if [ $? -ne 0 ]; then
-    initdb -D "$DATA_DIR" --auth-local=trust --no-instructions
+   echo "Error: initdb failed."
+   exit 1
 fi
 
 # 2. Configure postgresql.conf (Optimize for small ephemeral instance?)

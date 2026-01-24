@@ -16,6 +16,10 @@ DB_DATA_DIR="$WORLDS_DATA_DIR/db"
 LOG_DIR="$WORLDS_DATA_DIR/logs"
 WORLD_PATH="$HOME/snap/luanti/common/.minetest/worlds/$WORLD"
 
+# PostgreSQL Binaries Path (Adjusted for User's System)
+PG_BIN="/usr/lib/postgresql/12/bin"
+export PATH="$PG_BIN:$PATH"
+
 # Load Helper Functions
 source "$PROJECT_DIR/helper_functions.sh"
 
