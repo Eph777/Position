@@ -8,11 +8,10 @@ DB_USER="$3"
 DB_PASS="$4"
 DB_NAME="$5"
 
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCHEMA_FILE="$PROJECT_DIR/scripts/schema.sql"
+SCHEMA_FILE="schema.sql"
 
 # Explicit Paths for User Environment
-PG_BIN="/usr/lib/postgresql/12/bin"
+PG_BIN="/usr/lib/postgresql/16/bin"
 export PATH="$PG_BIN:$PATH"
 
 if [ ! -x "$PG_BIN/initdb" ]; then

@@ -292,9 +292,4 @@ async def sync_player(data: PlayerSync):
             
         return {"status": "synced", "team": team_name, "player_status": status}
 
-# Static Files
-# We expect 'static' folder next to this file (src/api/static)
-current_dir = os.path.dirname(os.path.abspath(__file__))
-static_dir = os.path.join(current_dir, "static")
-
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
+app.mount("/static", StaticFiles(directory="static"), name="static")

@@ -17,11 +17,11 @@ LOG_DIR="$WORLDS_DATA_DIR/logs"
 WORLD_PATH="$HOME/snap/luanti/common/.minetest/worlds/$WORLD"
 
 # PostgreSQL Explicit Path
-PG_BIN="/usr/lib/postgresql/12/bin"
+PG_BIN="/usr/lib/postgresql/16/bin"
 export PATH="$PG_BIN:$PATH"
 
 # Load Helper Functions
-source "$PROJECT_DIR/scripts/helper_functions.sh"
+source "$PROJECT_DIR/helper_functions.sh"
 
 echo "=== Luanti Session Launcher ==="
 echo "World: $WORLD"
@@ -138,29 +138,10 @@ export DB_NAME="$DB_NAME"
 export DB_USER="$DB_USER"
 export DB_PASS="$DB_PASS"
 
-# Ensure Environment
-if [ ! -d "$PROJECT_DIR/venv" ]; then
-    echo "Python virtual environment missing. Running setup..."
-    chmod +x "$PROJECT_DIR/scripts/setup_env.sh"
-    "$PROJECT_DIR/scripts/setup_env.sh"
-fi
-
-# ... Port Assignment ...
-
-# --- 4. Start Middleware ---
-echo "Starting Middleware on port $API_PORT..."
-export DB_HOST="localhost"
-export DB_PORT="$DB_PORT"
-export DB_NAME="$DB_NAME"
-export DB_USER="$DB_USER"
-export DB_PASS="$DB_PASS"
-
 (
     cd "$PROJECT_DIR"
-    # Run using venv python explicitly, pointing to src.api.main
-    # We add PROJECT_DIR to PYTHONPATH so it finds src module
-    export PYTHONPATH="$PROJECT_DIR"
-    "$PROJECT_DIR/venv/bin/python" -m uvicorn src.api.main:app --host 0.0.0.0 --port $API_PORT
+    # Run global uvicorn
+    python3 -m uvicorn server_fastapi:app --host 0.0.0.0 --port $API_PORT
 ) > "$LOG_DIR/api.log" 2>&1 &
 API_PID=$!
 PIDS="$PIDS $API_PID"
@@ -189,16 +170,15 @@ echo "Starting Map System on port $MAP_PORT..."
 # Renderer
 MAP_OUTPUT="$WORLD_PATH/map_output"
 mkdir -p "$MAP_OUTPUT"
-chmod +x "$PROJECT_DIR/scripts/auto_render_loop.sh"
+chmod +x "$PROJECT_DIR/auto_render_loop.sh"
 
-"$PROJECT_DIR/scripts/auto_render_loop.sh" "$WORLD" "$MAP_OUTPUT" > "$LOG_DIR/map_render.log" 2>&1 &
+"$PROJECT_DIR/auto_render_loop.sh" "$WORLD" "$MAP_OUTPUT" > "$LOG_DIR/map_render.log" 2>&1 &
 PIDS="$PIDS $!"
 
 # HTTP Server
 (
     cd "$MAP_OUTPUT"
-    # range_server is now in src/map/range_server.py
-    "$PROJECT_DIR/venv/bin/python" "$PROJECT_DIR/src/map/range_server.py" "$MAP_PORT"
+    python3 "$PROJECT_DIR/range_server.py" "$MAP_PORT"
 ) > "$LOG_DIR/map_http.log" 2>&1 &
 PIDS="$PIDS $!"
 
