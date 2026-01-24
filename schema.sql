@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS teams (
 
 -- 3. Player State (Current State & Inventory)
 CREATE TABLE IF NOT EXISTS players (
+    id SERIAL UNIQUE, -- Added for QGIS/Tools that require INT PK
     player_name TEXT PRIMARY KEY,
     team_id INT REFERENCES teams(team_id) ON DELETE SET NULL,
     pos_x DOUBLE PRECISION NOT NULL DEFAULT 0,
@@ -61,6 +62,7 @@ ORDER BY player_name, timestamp DESC;
 -- Projects pos_x and pos_z into PostGIS GEOMETRY(POINT, 4326)
 CREATE OR REPLACE VIEW v_tactical_map AS
 SELECT
+    p.id, -- Stable Integer ID for QGIS
     p.player_name,
     p.team_id,
     t.team_name,
