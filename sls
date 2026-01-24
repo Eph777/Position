@@ -8,6 +8,7 @@ REQ_MAP_PORT="$3"
 REQ_DB_PORT="$4"
 
 # Configuration
+# If running as root (SUDO_USER is set), we need to handle DB carefully.
 SERVICE_USER=${SUDO_USER:-$(whoami)}
 USER_HOME=$(eval echo ~$SERVICE_USER)
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,14 +21,21 @@ WORLD_PATH="$HOME/snap/luanti/common/.minetest/worlds/$WORLD"
 PG_BIN="/usr/lib/postgresql/16/bin"
 export PATH="$PG_BIN:$PATH"
 
-# Load Helper Functions
-source "$PROJECT_DIR/helper_functions.sh"
+# Load Helper Functions (New Path)
+source "$PROJECT_DIR/scripts/helper_functions.sh"
 
 echo "=== Luanti Session Launcher ==="
 echo "World: $WORLD"
+echo "Service User: $SERVICE_USER"
 
 # Ensure directories
 mkdir -p "$WORLDS_DATA_DIR" "$LOG_DIR" "$WORLD_PATH"
+
+# Fix permissions if running as root
+if [ "$EUID" -eq 0 ]; then
+    echo "Running as root. Adjusting permissions for $WORLDS_DATA_DIR..."
+    chown -R "$SERVICE_USER:$SERVICE_USER" "$WORLDS_DATA_DIR"
+fi
 
 # --- 1. Port Assignment ---
 
@@ -83,7 +91,12 @@ cleanup() {
     done
     
     echo "Stopping Database..."
-    "$PG_BIN/pg_ctl" -D "$DB_DATA_DIR" stop -m fast > /dev/null 2>&1
+    # Stop DB as the correct user
+    if [ "$EUID" -eq 0 ]; then
+        su - "$SERVICE_USER" -c "$PG_BIN/pg_ctl -D \"$DB_DATA_DIR\" stop -m fast" > /dev/null 2>&1
+    else
+        "$PG_BIN/pg_ctl" -D "$DB_DATA_DIR" stop -m fast > /dev/null 2>&1
+    fi
     
     echo "Cleanup complete."
     exit 0
@@ -101,7 +114,20 @@ DB_NAME="luanti_db"
 if [ ! -d "$DB_DATA_DIR" ]; then
     echo "Initializing new database cluster..."
     chmod +x "$PROJECT_DIR/scripts/init_world_db.sh"
-    "$PROJECT_DIR/scripts/init_world_db.sh" "$DB_DATA_DIR" "$DB_PORT" "$DB_USER" "$DB_PASS" "$DB_NAME"
+    
+    # We must run init script as non-root because initdb refuses to run as root.
+    # We pass the target user (SERVICE_USER) to the script or run the script AS that user.
+    # Running the whole script as user is safer.
+    
+    if [ "$EUID" -eq 0 ]; then
+         # Ensure permissions on the script first? It's likely owned by root if created by root.
+         # But the user needs to read/execute it.
+         chown "$SERVICE_USER:$SERVICE_USER" "$PROJECT_DIR/scripts/init_world_db.sh"
+         su - "$SERVICE_USER" -c "\"$PROJECT_DIR/scripts/init_world_db.sh\" \"$DB_DATA_DIR\" \"$DB_PORT\" \"$DB_USER\" \"$DB_PASS\" \"$DB_NAME\""
+    else
+         "$PROJECT_DIR/scripts/init_world_db.sh" "$DB_DATA_DIR" "$DB_PORT" "$DB_USER" "$DB_PASS" "$DB_NAME"
+    fi
+    
     if [ $? -ne 0 ]; then
         echo "Error: Database initialization failed."
         exit 1
@@ -110,7 +136,11 @@ fi
 
 # Start Postgres
 echo "Starting PostgreSQL on port $DB_PORT..."
-"$PG_BIN/pg_ctl" -D "$DB_DATA_DIR" -o "-p $DB_PORT" -l "$LOG_DIR/postgres.log" start -w
+if [ "$EUID" -eq 0 ]; then
+    su - "$SERVICE_USER" -c "$PG_BIN/pg_ctl -D \"$DB_DATA_DIR\" -o \"-p $DB_PORT\" -l \"$LOG_DIR/postgres.log\" start -w"
+else
+    "$PG_BIN/pg_ctl" -D "$DB_DATA_DIR" -o "-p $DB_PORT" -l "$LOG_DIR/postgres.log" start -w
+fi
 
 # Wait for DB to be responsive
 echo "Waiting for Database readiness..."
@@ -138,10 +168,34 @@ export DB_NAME="$DB_NAME"
 export DB_USER="$DB_USER"
 export DB_PASS="$DB_PASS"
 
+# Ensure Environment
+if [ ! -d "$PROJECT_DIR/venv" ]; then
+    echo "Python virtual environment missing. Running setup..."
+    chmod +x "$PROJECT_DIR/scripts/setup_env.sh"
+    if [ "$EUID" -eq 0 ]; then
+        chown "$SERVICE_USER:$SERVICE_USER" "$PROJECT_DIR/scripts/setup_env.sh"
+        su - "$SERVICE_USER" -c "\"$PROJECT_DIR/scripts/setup_env.sh\""
+    else
+        "$PROJECT_DIR/scripts/setup_env.sh"
+    fi
+fi
+
+# Ensure permissions on venv if root created it
+if [ "$EUID" -eq 0 ]; then
+    chown -R "$SERVICE_USER:$SERVICE_USER" "$PROJECT_DIR/venv"
+fi
+
 (
     cd "$PROJECT_DIR"
-    # Run global uvicorn
-    python3 -m uvicorn server_fastapi:app --host 0.0.0.0 --port $API_PORT
+    export PYTHONPATH="$PROJECT_DIR"
+    # Run using venv python explicitly, pointing to src.api.main
+    CMD="\"$PROJECT_DIR/venv/bin/python\" -m uvicorn src.api.main:app --host 0.0.0.0 --port $API_PORT"
+    
+    if [ "$EUID" -eq 0 ]; then
+        su - "$SERVICE_USER" -c "$CMD"
+    else
+        eval $CMD
+    fi
 ) > "$LOG_DIR/api.log" 2>&1 &
 API_PID=$!
 PIDS="$PIDS $API_PID"
@@ -155,7 +209,6 @@ for i in {1..10}; do
         cleanup
         exit 1
     fi
-    # Simple check if port is open using python oneliner because netcat might check TCP connect
     if python3 -c "import socket; s=socket.socket(); s.connect(('localhost', $API_PORT))" >/dev/null 2>&1; then
         echo "Middleware Ready."
         break
@@ -170,15 +223,32 @@ echo "Starting Map System on port $MAP_PORT..."
 # Renderer
 MAP_OUTPUT="$WORLD_PATH/map_output"
 mkdir -p "$MAP_OUTPUT"
-chmod +x "$PROJECT_DIR/auto_render_loop.sh"
+if [ "$EUID" -eq 0 ]; then
+    chown -R "$SERVICE_USER:$SERVICE_USER" "$MAP_OUTPUT"
+fi
+chmod +x "$PROJECT_DIR/scripts/auto_render_loop.sh"
 
-"$PROJECT_DIR/auto_render_loop.sh" "$WORLD" "$MAP_OUTPUT" > "$LOG_DIR/map_render.log" 2>&1 &
-PIDS="$PIDS $!"
+# Run renderer as user
+CMD="\"$PROJECT_DIR/scripts/auto_render_loop.sh\" \"$WORLD\" \"$MAP_OUTPUT\""
+if [ "$EUID" -eq 0 ]; then
+    su - "$SERVICE_USER" -c "$CMD" > "$LOG_DIR/map_render.log" 2>&1 &
+    PIDS="$PIDS $!"
+else
+    eval "$CMD" > "$LOG_DIR/map_render.log" 2>&1 &
+    PIDS="$PIDS $!"
+fi
 
 # HTTP Server
 (
     cd "$MAP_OUTPUT"
-    python3 "$PROJECT_DIR/range_server.py" "$MAP_PORT"
+    # range_server is now in src/map/range_server.py
+    # Using python from venv
+    CMD="\"$PROJECT_DIR/venv/bin/python\" \"$PROJECT_DIR/src/map/range_server.py\" \"$MAP_PORT\""
+    if [ "$EUID" -eq 0 ]; then
+        su - "$SERVICE_USER" -c "$CMD"
+    else
+        eval $CMD
+    fi
 ) > "$LOG_DIR/map_http.log" 2>&1 &
 PIDS="$PIDS $!"
 
@@ -194,6 +264,12 @@ echo "Ctrl+C to stop."
 SESSION_CONF="$WORLDS_DATA_DIR/minetest.conf"
 SYSTEM_CONF="$HOME/snap/luanti/common/.minetest/minetest.conf"
 
+# Fix ownership of config if root
+if [ "$EUID" -eq 0 ]; then
+    touch "$SESSION_CONF"
+    chown "$SERVICE_USER:$SERVICE_USER" "$SESSION_CONF"
+fi
+
 if [ -f "$SYSTEM_CONF" ]; then
     cat "$SYSTEM_CONF" > "$SESSION_CONF"
 else
@@ -204,6 +280,15 @@ echo "" >> "$SESSION_CONF"
 echo "secure.http_mods = position_tracker" >> "$SESSION_CONF"
 echo "position_tracker.url = http://localhost:$API_PORT" >> "$SESSION_CONF"
 
-/snap/bin/luanti --server --world "$WORLD_PATH" --gameid minetest_game --port $GAME_PORT --config "$SESSION_CONF"
+# Luanti might need running as user too?
+# Usually snap binaries are fine, but prefer running as user to access user's home/worlds.
+CMD="/snap/bin/luanti --server --world \"$WORLD_PATH\" --gameid minetest_game --port $GAME_PORT --config \"$SESSION_CONF\""
+
+if [ "$EUID" -eq 0 ]; then
+     # Use su to run as service user
+     su - "$SERVICE_USER" -c "$CMD"
+else
+     eval $CMD
+fi
 
 cleanup
