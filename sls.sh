@@ -1,7 +1,9 @@
 #!/bin/bash
 # This script will setup the map hosting and then start the Luanti server
-PORT=$2
-WORLD="$1"
+
+# Default values
+WORLD="${1:-myworld}"
+PORT="${2:-30000}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -22,26 +24,35 @@ print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-if [ -d "~/snap/luanti/common/.minetest/worlds/$WORLD" ]; then
+WORLD_DIR="$HOME/snap/luanti/common/.minetest/worlds/$WORLD"
 
-    if [ -f "~/snap/luanti/common/.minetest/worlds/$WORLD/world.mt" ]; then
+if [ -d "$WORLD_DIR" ]; then
+
+    if [ -f "$WORLD_DIR/world.mt" ]; then
         print_info "World $WORLD exists."
+        # Ensure mod is enabled
+        if ! grep -q "load_mod_position_tracker = true" "$WORLD_DIR/world.mt"; then
+            echo "load_mod_position_tracker = true" >> "$WORLD_DIR/world.mt"
+            print_info "Enabled position_tracker mod in existing world."
+        fi
     else
-        print_info "creating $WORLD's world.mt file."
-        echo "gameid = minetest_game" > "~/snap/luanti/common/.minetest/worlds/$WORLD/world.mt"
-        echo "backend = sqlite3" >> "~/snap/luanti/common/.minetest/worlds/$WORLD/world.mt"
-        echo "player_backend = sqlite3" >> "~/snap/luanti/common/.minetest/worlds/$WORLD/world.mt"
-        echo "auth_backend = sqlite3" >> "~/snap/luanti/common/.minetest/worlds/$WORLD/world.mt"
-        echo "mod_storage_backend = sqlite3" >> "~/snap/luanti/common/.minetest/worlds/$WORLD/world.mt"
+        print_info "Creating $WORLD's world.mt file."
+        echo "gameid = minetest_game" > "$WORLD_DIR/world.mt"
+        echo "backend = sqlite3" >> "$WORLD_DIR/world.mt"
+        echo "player_backend = sqlite3" >> "$WORLD_DIR/world.mt"
+        echo "auth_backend = sqlite3" >> "$WORLD_DIR/world.mt"
+        echo "mod_storage_backend = sqlite3" >> "$WORLD_DIR/world.mt"
+        echo "load_mod_position_tracker = true" >> "$WORLD_DIR/world.mt"
     fi
 else
-    print_info "creating world $WORLD."
-    mkdir -p "~/snap/luanti/common/.minetest/worlds/$WORLD"
-    echo "gameid = minetest_game" > "~/snap/luanti/common/.minetest/worlds/$WORLD/world.mt"
-    echo "backend = sqlite3" >> "~/snap/luanti/common/.minetest/worlds/$WORLD/world.mt"
-    echo "player_backend = sqlite3" >> "~/snap/luanti/common/.minetest/worlds/$WORLD/world.mt"
-    echo "auth_backend = sqlite3" >> "~/snap/luanti/common/.minetest/worlds/$WORLD/world.mt"
-    echo "mod_storage_backend = sqlite3" >> "~/snap/luanti/common/.minetest/worlds/$WORLD/world.mt"
+    print_info "Creating world $WORLD."
+    mkdir -p "$WORLD_DIR"
+    echo "gameid = minetest_game" > "$WORLD_DIR/world.mt"
+    echo "backend = sqlite3" >> "$WORLD_DIR/world.mt"
+    echo "player_backend = sqlite3" >> "$WORLD_DIR/world.mt"
+    echo "auth_backend = sqlite3" >> "$WORLD_DIR/world.mt"
+    echo "mod_storage_backend = sqlite3" >> "$WORLD_DIR/world.mt"
+    echo "load_mod_position_tracker = true" >> "$WORLD_DIR/world.mt"
 fi
 
 PORT_IN_USE=$(sudo lsof -i :$PORT -t 2>/dev/null || true)
@@ -77,4 +88,4 @@ if [ ! -z "$PORT_IN_USE" ]; then
     fi
 fi
 
-/snap/bin/luanti --server --world ~/snap/luanti/common/.minetest/worlds/$WORLD --gameid minetest_game --port $PORT
+/snap/bin/luanti --server --world "$WORLD_DIR" --gameid minetest_game --port $PORT
