@@ -86,13 +86,13 @@ if [ -n "$MAP_PORT" ]; then
     
     # Verify services are running
     sleep 2
-    if systemctl is-active --quiet luanti-map-render && systemctl is-active --quiet luanti-map-server; then
+    if systemctl is-active --quiet "luanti-map-render@${WORLD}" && systemctl is-active --quiet "luanti-map-server@${WORLD}"; then
         print_info "Map services started successfully!"
         print_info "Map will be available at: http://$(hostname -I | awk '{print $1}'):$MAP_PORT/map.png"
     else
         print_warning "Map services may not have started correctly. Check with:"
-        echo "  sudo systemctl status luanti-map-render"
-        echo "  sudo systemctl status luanti-map-server"
+        echo "  sudo systemctl status luanti-map-render@${WORLD}"
+        echo "  sudo systemctl status luanti-map-server@${WORLD}"
     fi
     echo ""
 fi

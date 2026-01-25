@@ -19,7 +19,7 @@ USER_HOME=$(get_user_home)
 MAPPER_EXE="$USER_HOME/minetest-mapper/minetestmapper"
 COLORS_FILE="$USER_HOME/minetest-mapper/colors.txt"
 WORLD_PATH="$USER_HOME/snap/luanti/common/.minetest/worlds/$WORLD"
-OUTPUT_DIR="$PROJECT_ROOT/map_output"
+OUTPUT_DIR="$WORLD_PATH/map_output"  # Store maps inside world folder
 OUTPUT_IMAGE="$OUTPUT_DIR/map.png"
 OUTPUT_WORLD_FILE="$OUTPUT_DIR/map.pgw"
 

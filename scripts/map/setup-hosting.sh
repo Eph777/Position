@@ -19,26 +19,30 @@ fi
 SERVICE_USER=$(get_current_user)
 USER_HOME=$(get_user_home)
 PROJECT_ROOT=$(get_project_root)
-MAP_OUTPUT_DIR="$PROJECT_ROOT/map_output"
+WORLD_PATH="$USER_HOME/snap/luanti/common/.minetest/worlds/$WORLD"
+MAP_OUTPUT_DIR="$WORLD_PATH/map_output"  # Store maps inside world folder
 
-# Ensure directories exist and have correct permissions
-if [ ! -d "$PROJECT_ROOT" ]; then
-    print_info "Creating project directory: $PROJECT_ROOT"
-    mkdir -p "$PROJECT_ROOT"
+# Ensure world exists
+if [ ! -d "$WORLD_PATH" ]; then
+    print_error "World directory not found: $WORLD_PATH"
+    print_info "Make sure to create the world first or run the Luanti server once"
+    exit 1
 fi
+
+# Create map output directory
 mkdir -p "$MAP_OUTPUT_DIR"
 
 # Ensure the service user owns the directory
-print_info "Setting permissions for $SERVICE_USER on $PROJECT_ROOT..."
-sudo chown -R "$SERVICE_USER:$SERVICE_USER" "$PROJECT_ROOT"
+print_info "Setting permissions for $SERVICE_USER on $MAP_OUTPUT_DIR..."
+sudo chown -R "$SERVICE_USER:$SERVICE_USER" "$MAP_OUTPUT_DIR"
 
 print_info "Setting up real-time map services..."
 
-# Create Map Renderer Service
-print_info "Creating luanti-map-render.service..."
-sudo tee /etc/systemd/system/luanti-map-render.service > /dev/null <<EOF
+# Create Map Renderer Service (world-specific)
+print_info "Creating luanti-map-render@${WORLD}.service..."
+sudo tee /etc/systemd/system/luanti-map-render@${WORLD}.service > /dev/null <<EOF
 [Unit]
-Description=Luanti Map Auto-Renderer (15s Interval)
+Description=Luanti Map Auto-Renderer - ${WORLD} (15s Interval)
 
 [Service]
 Type=simple
@@ -51,11 +55,11 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
-# Create HTTP Map Server Service
-print_info "Creating luanti-map-server.service..."
-sudo tee /etc/systemd/system/luanti-map-server.service > /dev/null <<EOF
+# Create HTTP Map Server Service (world-specific)
+print_info "Creating luanti-map-server@${WORLD}.service..."
+sudo tee /etc/systemd/system/luanti-map-server@${WORLD}.service > /dev/null <<EOF
 [Unit]
-Description=Luanti Map HTTP Server (Port ${MAP_PORT})
+Description=Luanti Map HTTP Server - ${WORLD} (Port ${MAP_PORT})
 
 [Service]
 Type=simple
@@ -75,10 +79,16 @@ sudo ufw allow ${MAP_PORT}/tcp
 # Start Services
 print_info "Starting services..."
 sudo systemctl daemon-reload
-sudo systemctl enable luanti-map-render
-sudo systemctl start luanti-map-render
-sudo systemctl enable luanti-map-server
-sudo systemctl start luanti-map-server
+sudo systemctl enable luanti-map-render@${WORLD}
+sudo systemctl start luanti-map-render@${WORLD}
+sudo systemctl enable luanti-map-server@${WORLD}
+sudo systemctl start luanti-map-server@${WORLD}
 
 print_info "Map services started successfully!"
 echo "Map is now hosted at: http://$(hostname -I | awk '{print $1}'):${MAP_PORT}/map.png"
+echo ""
+print_info "Service Management Commands:"
+echo "  Status:  sudo systemctl status luanti-map-render@${WORLD}"
+echo "  Status:  sudo systemctl status luanti-map-server@${WORLD}"
+echo "  Logs:    sudo journalctl -u luanti-map-render@${WORLD} -f"
+echo "  Logs:    sudo journalctl -u luanti-map-server@${WORLD} -f"
