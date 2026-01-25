@@ -331,7 +331,6 @@ def serve_index():
     """Serve the control panel HTML"""
     return send_from_directory(app.static_folder, 'index.html')
 
-@app.route('/', methods=['GET'])
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({"status": "running"}), 200
