@@ -1,5 +1,20 @@
 #!/bin/bash
-# Unified deployment script for Luanti Position Tracker
+# Copyright (C) 2026 Ephraim BOURIAHI
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# Unified deployment script for Luanti/QGIS
 # Usage: 
 #   ./deploy.sh                    # Interactive setup
 #   ./deploy.sh --auto             # Non-interactive deployment (production)
@@ -26,6 +41,27 @@ while [[ $# -gt 0 ]]; do
         --auto) AUTO=true; shift ;;
         --update) UPDATE=true; shift ;;
         --status) STATUS_ONLY=true; shift ;;
+        --warranty)
+            echo "    There is NO WARRANTY, to the extent permitted by law.  Except when"
+            echo "    otherwise stated in writing the copyright holders and/or other parties"
+            echo "    provide the program \"AS IS\" without warranty of any kind, either"
+            echo "    expressed or implied, including, but not limited to, the implied"
+            echo "    warranties of merchantability and fitness for a particular purpose."
+            echo "    The entire risk as to the quality and performance of the program is"
+            echo "    with you.  Should the program prove defective, you assume the cost of"
+            echo "    all necessary servicing, repair or correction."
+            exit 0
+            ;;
+        --license)
+            echo "    This program is free software: you can redistribute it and/or modify"
+            echo "    it under the terms of the GNU General Public License as published by"
+            echo "    the Free Software Foundation, either version 3 of the License, or"
+            echo "    (at your option) any later version."
+            echo ""
+            echo "    You should have received a copy of the GNU General Public License"
+            echo "    along with this program.  If not, see <https://www.gnu.org/licenses/>."
+            exit 0
+            ;;
         --config) CONFIG_FILE="$2"; shift 2 ;;
         --world) WORLD_NAME="$2"; shift 2 ;;
         -h|--help)
@@ -34,7 +70,9 @@ while [[ $# -gt 0 ]]; do
             echo "OPTIONS:"
             echo "  --auto             Non-interactive deployment"
             echo "  --update           Update existing deployment"
-            echo "  --status           Check deployment status" 
+            echo "  --status           Check deployment status
+  --warranty         Show warranty information
+  --license          Show license information" 
             echo "  --config FILE      Load configuration from FILE"
             echo "  --world NAME       Specify world name (default: myworld)"
             echo "  -h, --help         Show this help message"
@@ -74,8 +112,12 @@ fi
 
 # Banner
 print_info "================================================================"
-print_info "       Luanti Position Tracker - Unified Deployment"
+print_info "       Luanti/QGIS - Unified Deployment"
 print_info "================================================================"
+echo "       Luanti/QGIS  Copyright (C) 2026 Ephraim BOURIAHI"
+echo "       This program comes with ABSOLUTELY NO WARRANTY; for details use '$0 --warranty'."
+echo "       This is free software, and you are welcome to redistribute it"
+echo "       under certain conditions; use '$0 --license' for details."
 echo ""
 
 # Update mode

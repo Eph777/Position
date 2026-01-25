@@ -1,5 +1,20 @@
 #!/bin/bash
-# PostgreSQL setup for Luanti Position Tracker
+# Copyright (C) 2026 Ephraim BOURIAHI
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# PostgreSQL setup for Luanti/QGIS
 # Usage: ./postgresql.sh [--auto]
 
 # Load common functions
@@ -26,7 +41,7 @@ USER_HOME=$(get_user_home)
 CURRENT_USER=$(get_current_user)
 PROJECT_ROOT=$(get_project_root)
 
-print_info "=== Luanti Position Tracker - PostgreSQL Setup ==="
+print_info "=== Luanti/QGIS - PostgreSQL Setup ==="
 echo ""
 print_warning "This script will:"
 echo "  1. Update system packages"
@@ -230,7 +245,7 @@ print_info "Creating systemd service..."
 
 sudo tee /etc/systemd/system/luanti-tracker-postgresql.service > /dev/null <<EOF
 [Unit]
-Description=Luanti Player Position Tracker (PostgreSQL)
+Description=Luanti/QGIS (PostgreSQL)
 After=network.target postgresql.service
 
 [Service]

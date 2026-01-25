@@ -1,6 +1,6 @@
-# Luanti Player Position Tracker - Production Deployment Guide
+# Luanti/QGIS - Production Deployment Guide
 
-This guide provides step-by-step instructions for deploying the Luanti Position Tracker on a production server.
+This guide provides step-by-step instructions for deploying the Luanti/QGIS on a production server.
 
 ## Table of Contents
 

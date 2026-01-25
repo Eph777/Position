@@ -1,4 +1,4 @@
-# Luanti Player Position Tracker
+# Luanti/QGIS
 
 A comprehensive system for tracking and storing player positions from a Luanti (formerly Minetest) game server using **PostgreSQL**, with real-time map rendering and HTTP hosting capabilities.
 
@@ -81,7 +81,7 @@ luanti-position-tracker/
 ├── config/
 │   └── .env.example           # Configuration template
 ├── mod/
-│   ├── init.lua               # Luanti position tracker mod
+│   ├── init.lua               # Luanti/QGIS mod
 │   └── mod.conf               # Mod configuration
 ├── schema.sql                 # PostgreSQL schema
 ├── requirements.txt           # Python dependencies
@@ -566,3 +566,8 @@ For issues:
 2. Run status check: `./bin/deploy.sh --status`
 3. Review troubleshooting section above
 4. Open an issue on GitHub
+
+## Contact
+
+Ephraim BOURIAHI - amar-ephraim.bouriahi@etu.u-pec.fr
+Project Link: [https://github.com/Eph777/Position](https://github.com/Eph777/Position)
