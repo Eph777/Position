@@ -1,0 +1,176 @@
+#!/bin/bash
+# Unified deployment script for Luanti Position Tracker
+# Usage: 
+#   ./deploy.sh                    # Interactive setup
+#   ./deploy.sh --auto             # Non-interactive deployment (production)
+#   ./deploy.sh --update           # Update existing deployment
+#   ./deploy.sh --status           # Check deployment status
+
+set -e  # Exit on error
+
+# Load common functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$PROJECT_ROOT/src/lib/common.sh"
+
+# Default values
+AUTO=false
+UPDATE=false
+STATUS_ONLY=false
+CONFIG_FILE=""
+WORLD_NAME="myworld"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --auto) AUTO=true; shift ;;
+        --update) UPDATE=true; shift ;;
+        --status) STATUS_ONLY=true; shift ;;
+        --config) CONFIG_FILE="$2"; shift 2 ;;
+        --world) WORLD_NAME="$2"; shift 2 ;;
+        -h|--help)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "OPTIONS:"
+            echo "  --auto             Non-interactive deployment"
+            echo "  --update           Update existing deployment"
+            echo "  --status           Check deployment status" 
+            echo "  --config FILE      Load configuration from FILE"
+            echo "  --world NAME       Specify world name (default: myworld)"
+            echo "  -h, --help         Show this help message"
+            echo ""
+            exit 0
+            ;;
+        *) print_error "Unknown option: $1"; exit 1 ;;
+    esac
+done
+
+# Load configuration if provided
+if [ -n "$CONFIG_FILE" ]; then
+    load_env "$CONFIG_FILE"
+fi
+
+# Status check mode
+if [ "$STATUS_ONLY" = true ]; then
+    print_info "=== Deployment Status ==="
+    echo ""
+    
+    print_info "Services:"
+    systemctl status luanti-tracker-postgresql --no-pager | head -n 3 || echo "  luanti-tracker-postgresql: Not found"
+    systemctl status luanti-map-render --no-pager | head -n 3 || echo "  luanti-map-render: Not found"
+    systemctl status luanti-map-server --no-pager | head -n 3 || echo "  luanti-map-server: Not found"
+    
+    echo ""
+    print_info "Active Ports:"
+    sudo lsof -i :5000 || echo "  Port 5000: Not in use"
+    sudo lsof -i :8080 || echo "  Port 8080: Not in use"
+    
+    echo ""
+    print_info "Database Status:"
+    sudo -u postgres psql -c "\l" | grep luanti_db || echo "  Database luanti_db: Not found"
+    
+    exit 0
+fi
+
+# Banner
+print_info "================================================================"
+print_info "       Luanti Position Tracker - Unified Deployment"
+print_info "================================================================"
+echo ""
+
+# Update mode
+if [ "$UPDATE" = true ]; then
+    print_info "=== Update Mode ==="
+    
+    # Pull latest code
+    if [ -d "$PROJECT_ROOT/.git" ]; then
+        print_info "Pulling latest code..."
+        cd "$PROJECT_ROOT"
+        git pull
+    fi
+    
+    # Update Python dependencies
+    if [ -d "$PROJECT_ROOT/venv" ]; then
+        print_info "Updating Python dependencies..."
+        source "$PROJECT_ROOT/venv/bin/activate"
+        pip install --upgrade -r requirements.txt
+    fi
+    
+    # Update mod
+    USER_HOME=$(get_user_home)
+    if [ -d "${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker" ]; then
+        print_info "Updating position tracker mod..."
+        cp -r "$PROJECT_ROOT/mod/"* "${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker/"
+    fi
+    
+    # Restart services
+    print_info "Restarting services..."
+    sudo systemctl restart luanti-tracker-postgresql 2>/dev/null || true
+    sudo systemctl restart luanti-map-render 2>/dev/null || true
+    sudo systemctl restart luanti-map-server 2>/dev/null || true
+    
+    print_info "Update complete!"
+    exit 0
+fi
+
+# Fresh installation
+print_info "Starting fresh installation..."
+echo ""
+
+if [ "$AUTO" = false ]; then
+    print_warning "This will install and configure:"
+    echo "  • PostgreSQL database"
+    echo "  • Python Flask server"
+    echo "  • Luanti game server"
+    echo "  • Map rendering system"
+    echo "  • All required systemd services"
+    echo ""
+    confirm "Do you want to continue?" || exit 0
+fi
+
+# Step 1: Run PostgreSQL setup
+print_info "=== Step 1/4: PostgreSQL Setup ==="
+if [ "$AUTO" = true ]; then
+    "$PROJECT_ROOT/scripts/setup/postgresql.sh" --auto
+else
+    "$PROJECT_ROOT/scripts/setup/postgresql.sh"
+fi
+
+# Step 2: Migrate backend
+print_info "=== Step 2/4: Backend Migration ==="
+"$PROJECT_ROOT/scripts/server/migrate-backend.sh" "$WORLD_NAME" --force
+
+# Step 3: Setup mapper
+print_info "=== Step 3/4: Map Renderer Setup ==="
+"$PROJECT_ROOT/scripts/setup/mapper.sh" "$WORLD_NAME"
+
+# Step 4: Setup map hosting
+print_info "=== Step 4/4: Map Hosting Setup ==="
+"$PROJECT_ROOT/scripts/map/setup-hosting.sh" "$WORLD_NAME"
+
+# Final summary
+echo ""
+print_info "================================================================"
+print_info "                    Deployment Complete!"
+print_info "================================================================"
+echo ""
+print_info "Services Status:"
+sudo systemctl status luanti-tracker-postgresql --no-pager | head -n 3
+echo ""
+print_info "Next Steps:"
+echo "  1. Start Luanti server:"
+echo "     ~/sls $WORLD_NAME 30000"
+echo ""
+echo "  2. Connect from Luanti client:"
+echo "     Server: $(hostname -I | awk '{print $1}')"
+echo "     Port: 30000"
+echo ""
+echo "  3. View map:"
+echo "     http://$(hostname -I | awk '{print $1}'):8080/map.png"
+echo ""
+print_info "Configuration saved in: $PROJECT_ROOT/.env"
+echo ""
+print_info "To check status: $0 --status"
+print_info "To update deployment: $0 --update"
+echo ""
+print_warning "Remember to change default passwords in production!"

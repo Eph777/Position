@@ -1,12 +1,25 @@
 #!/bin/bash
+# Render Luanti world map once
+# Usage: ./render.sh <world_name>
+
+# Load common functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../../src/lib/common.sh"
 
 WORLD="$1"
 
+if [ -z "$WORLD" ]; then
+    print_error "Usage: $0 <world_name>"
+    exit 1
+fi
+
+USER_HOME=$(get_user_home)
+
 # Configuration
-MAPPER_EXE="$HOME/minetest-mapper/minetestmapper"
-COLORS_FILE="$HOME/minetest-mapper/colors.txt"
-WORLD_PATH="$HOME/snap/luanti/common/.minetest/worlds/$WORLD"
-OUTPUT_DIR="$HOME/luanti-qgis/map_output"
+MAPPER_EXE="$USER_HOME/minetest-mapper/minetestmapper"
+COLORS_FILE="$USER_HOME/minetest-mapper/colors.txt"
+WORLD_PATH="$USER_HOME/snap/luanti/common/.minetest/worlds/$WORLD"
+OUTPUT_DIR="$USER_HOME/luanti-qgis/map_output"
 OUTPUT_IMAGE="$OUTPUT_DIR/map.png"
 OUTPUT_WORLD_FILE="$OUTPUT_DIR/map.pgw"
 
@@ -15,11 +28,18 @@ mkdir -p "$OUTPUT_DIR"
 
 # Check if world exists
 if [ ! -f "$WORLD_PATH/map.sqlite" ]; then
-    echo "Error: map.sqlite not found at $WORLD_PATH/map.sqlite"
+    print_error "map.sqlite not found at $WORLD_PATH/map.sqlite"
     exit 1
 fi
 
-echo "Rendering map..."
+# Check if mapper executable exists
+if [ ! -f "$MAPPER_EXE" ]; then
+    print_error "Mapper executable not found at $MAPPER_EXE"
+    print_info "Run scripts/setup/mapper.sh to install minetest-mapper"
+    exit 1
+fi
+
+print_info "Rendering map for world: $WORLD"
 TEMP_IMAGE="$OUTPUT_DIR/map_temp.png"
 
 # Render to temp file first (Atomic update)
@@ -28,7 +48,7 @@ $MAPPER_EXE --input "$WORLD_PATH" --output "$TEMP_IMAGE" --bgcolor "#ffffff" --c
 if [ $? -eq 0 ]; then
     # Atomically move temp file to final file
     mv "$TEMP_IMAGE" "$OUTPUT_IMAGE"
-    echo "Map rendered successfully: $OUTPUT_IMAGE"
+    print_info "Map rendered successfully: $OUTPUT_IMAGE"
     
     # Generate World File (.pgw) for QGIS
     # Format:
@@ -39,18 +59,6 @@ if [ $? -eq 0 ]; then
     # Line 5: Upper-left X coordinate
     # Line 6: Upper-left Y coordinate
     
-    # NOTE: minetest-mapper geometry format is `minx:minz:w:h`
-    # We used -5000:-5000:10000:10000
-    # So Top-Left X = -5000
-    #    Top-Left Y = 5000 (Because +Z is North/Up in QGIS, but Z increases North in Minetest too?)
-    #    
-    #    Wait, in Minetest: +X=East, +Z=North, +Y=Up(Elevation)
-    #    In QGIS: +X=East, +Y=North
-    #    So Minetest Z maps to QGIS Y.
-    #    
-    #    If our extent starts at Z=-5000 (Bottom) and height is 10000, 
-    #    then the Top boundary is -5000 + 10000 = +5000.
-    
     echo "1.0" > "$OUTPUT_WORLD_FILE"
     echo "0.0" >> "$OUTPUT_WORLD_FILE"
     echo "0.0" >> "$OUTPUT_WORLD_FILE"
@@ -58,8 +66,8 @@ if [ $? -eq 0 ]; then
     echo "-5000.0" >> "$OUTPUT_WORLD_FILE"  # Top-Left X (Min X)
     echo "5000.0" >> "$OUTPUT_WORLD_FILE"   # Top-Left Y (Max Z)
     
-    echo "World file generated: $OUTPUT_WORLD_FILE"
+    print_info "World file generated: $OUTPUT_WORLD_FILE"
 else
-    echo "Rendering failed!"
+    print_error "Rendering failed!"
     exit 1
 fi

@@ -27,6 +27,7 @@ wheels/
 .env
 *.env
 !.env.example
+!config/.env.example
 
 # IDE
 .vscode/
@@ -38,3 +39,23 @@ wheels/
 # OS
 .DS_Store
 Thumbs.db
+
+# Old scripts (deprecated)
+setup_*.sh
+render_map.sh
+auto_render_loop.sh
+migrate.sh
+sls.sh
+reset_environment.sh
+
+# Map output
+map_output/
+*.png
+*.pgw
+
+# Database backups
+*.sql.backup
+backup_*.sql
+
+# World data
+worlds_data/

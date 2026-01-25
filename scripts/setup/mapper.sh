@@ -1,28 +1,21 @@
 #!/bin/bash
+# Install and compile minetestmapper for map rendering
+# Usage: ./mapper.sh <world_name>
+
+# Load common functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../../src/lib/common.sh"
 
 WORLD="$1"
-# Colors for output
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m'
 
-print_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
+if [ -z "$WORLD" ]; then
+    print_error "Usage: $0 <world_name>"
+    exit 1
+fi
 
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Configuration
-MAPPER_DIR="$HOME/minetest-mapper"
-# Standard location for Snap installs
-WORLD_PATH="$HOME/snap/luanti/common/.minetest/worlds/$WORLD"
+USER_HOME=$(get_user_home)
+MAPPER_DIR="$USER_HOME/minetest-mapper"
+WORLD_PATH="$USER_HOME/snap/luanti/common/.minetest/worlds/$WORLD"
 
 print_info "=== Minetest Mapper Setup ==="
 
@@ -32,7 +25,7 @@ sudo apt update
 sudo apt install -y cmake libgd-dev zlib1g-dev libpng-dev libjpeg-dev libsqlite3-dev libpq-dev libhiredis-dev libleveldb-dev libzstd-dev git build-essential
 
 # Verify cmake installed
-if ! command -v cmake &> /dev/null; then
+if ! command_exists cmake; then
     print_error "cmake could not be installed. Please install it manually."
     exit 1
 fi
@@ -67,11 +60,10 @@ else
 fi
 
 # Step 5: Copy colors.txt
-# This file defines how blocks are colored.
 if [ ! -f "$MAPPER_DIR/colors.txt" ]; then
     print_info "Downloading default colors.txt..."
     wget https://raw.githubusercontent.com/luanti-org/minetestmapper/master/colors.txt -O "$MAPPER_DIR/colors.txt"
 fi
 
-print_info "Setup complete! executable is located at: $MAPPER_DIR/minetestmapper"
-print_info "You can now run ./render_map.sh to generate your map."
+print_info "Setup complete! Executable is located at: $MAPPER_DIR/minetestmapper"
+print_info "You can now run scripts/map/render.sh to generate your map."
