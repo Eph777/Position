@@ -3,7 +3,6 @@
 # Usage: ./reset-env.sh [--force]
 
 # Load common functions
-echo $(cd ../../ && pwd) > /root/.proj_root
 PROJECT_ROOT=$(cat /root/.proj_root)
 source $PROJECT_ROOT/src/lib/common.sh
 
