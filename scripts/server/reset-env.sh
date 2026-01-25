@@ -41,13 +41,35 @@ for svc in $services; do
     sudo systemctl disable "$svc" 2>/dev/null || true
 done
 
+
+# # Stop legacy/global services
+# sudo systemctl stop luanti-tracker-postgresql 2>/dev/null
+# sudo systemctl stop luanti-map-render 2>/dev/null
+# sudo systemctl stop luanti-map-server 2>/dev/null
+# sudo systemctl stop luanti-server@* 2>/dev/null
+# sudo systemctl disable luanti-tracker-postgresql 2>/dev/null
+# sudo systemctl disable luanti-map-render 2>/dev/null
+# sudo systemctl disable luanti-map-server 2>/dev/null
+# sudo systemctl disable luanti-server@* 2>/dev/null
+
+# pkill -f luanti
+# pkill -f python3
+
+# echo -e "${GREEN}[INFO] Removing systemd service files...${NC}"
+# sudo rm /etc/systemd/system/luanti-server@*.service 2>/dev/null
+# sudo rm /etc/systemd/system/luanti-tracker-postgresql.service 2>/dev/null
+# sudo rm /etc/systemd/system/luanti-map-render.service 2>/dev/null
+# sudo rm /etc/systemd/system/luanti-map-server.service 2>/dev/null
+
+# sudo systemctl daemon-reload
+
 # Stop legacy/global services
 sudo systemctl stop luanti-tracker-postgresql 2>/dev/null || true
-sudo systemctl stop luanti-map-render 2>/dev/null || true
-sudo systemctl stop luanti-map-server 2>/dev/null || true
+sudo systemctl stop luanti-map-render@* 2>/dev/null || true
+sudo systemctl stop luanti-map-server@* 2>/dev/null || true
 sudo systemctl disable luanti-tracker-postgresql 2>/dev/null || true
-sudo systemctl disable luanti-map-render 2>/dev/null || true
-sudo systemctl disable luanti-map-server 2>/dev/null || true
+sudo systemctl disable luanti-map-render@* 2>/dev/null || true
+sudo systemctl disable luanti-map-server@* 2>/dev/null || true
 
 pkill -f luanti || true
 pkill -f python3 || true
@@ -55,8 +77,8 @@ pkill -f python3 || true
 print_info "Removing systemd service files..."
 sudo rm -f /etc/systemd/system/luanti-server@*.service 2>/dev/null || true
 sudo rm -f /etc/systemd/system/luanti-tracker-postgresql.service 2>/dev/null || true
-sudo rm -f /etc/systemd/system/luanti-map-render.service 2>/dev/null || true
-sudo rm -f /etc/systemd/system/luanti-map-server.service 2>/dev/null || true
+sudo rm -f /etc/systemd/system/luanti-map-render@*.service 2>/dev/null || true
+sudo rm -f /etc/systemd/system/luanti-map-server@*.service 2>/dev/null || true
 
 sudo systemctl daemon-reload
 
