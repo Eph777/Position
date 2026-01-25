@@ -69,6 +69,14 @@ def start_world(world_name: str, port: int = 30000, map_port: Optional[int] = No
     if not os.path.exists(START_SCRIPT):
         return False, f"Start script not found: {START_SCRIPT}"
     
+    # Create .proj_root file for scripts to read PROJECT_ROOT
+    proj_root_file = os.path.expanduser("~/.proj_root")
+    try:
+        with open(proj_root_file, 'w') as f:
+            f.write(PROJECT_ROOT)
+    except Exception as e:
+        return False, f"Failed to create .proj_root file: {str(e)}"
+    
     # Build command
     cmd = [START_SCRIPT, world_name, str(port)]
     
