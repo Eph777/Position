@@ -80,9 +80,9 @@ minetest.register_globalstep(function(dtime)
                 player = name,
                 world = WORLD_NAME,
                 pos = {
-                    x = pos.x+9,
+                    x = pos.x+8,
                     y = pos.y,
-                    z = pos.z+7
+                    z = pos.z-8
                 }
             }
 
