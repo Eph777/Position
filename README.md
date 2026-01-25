@@ -186,22 +186,48 @@ MAP_RENDER_INTERVAL=15
 
 ## Service Management
 
-### Systemd Services
+### Starting Luanti Server
 
-Three services are created automatically:
-
+#### Foreground Mode (Interactive)
 ```bash
-# Position tracker (Flask server)
-sudo systemctl status luanti-tracker-postgresql
-sudo systemctl restart luanti-tracker-postgresql
+# Start server in foreground (Ctrl+C to stop)
+~/start-luanti.sh myworld 30000
 
-# Map renderer (auto-render every 15s)
-sudo systemctl status luanti-map-render
-sudo systemctl restart luanti-map-render
+# Or using the script directly
+./scripts/server/start-luanti.sh myworld 30000
+```
 
-# Map HTTP server (serves map.png)
-sudo systemctl status luanti-map-server
-sudo systemctl restart luanti-map-server
+#### Service Mode (Background)
+```bash
+# Start as systemd service (runs in background)
+~/start-luanti.sh myworld 30000 --service
+
+# Or using the script directly
+./scripts/server/start-luanti.sh myworld 30000 --service
+```
+
+When started as a service, you get:
+- Automatic restart on failure
+- Persistent logs via journalctl
+- Starts automatically on boot
+- Runs in background
+
+**Service Management:**
+```bash
+# Check service status
+sudo systemctl status luanti-server@myworld
+
+# Stop service
+sudo systemctl stop luanti-server@myworld
+
+# Restart service
+sudo systemctl restart luanti-server@myworld
+
+# View logs
+sudo journalctl -u luanti-server@myworld -f
+
+# Disable auto-start
+sudo systemctl disable luanti-server@myworld
 ```
 
 ### View Logs
@@ -215,6 +241,27 @@ sudo journalctl -u luanti-map-render -f
 
 # Map server logs
 sudo journalctl -u luanti-map-server -f
+
+# Luanti game server logs
+sudo journalctl -u luanti-server@myworld -f
+```
+
+### Automated Background Services
+
+Three additional services are created automatically by the deployment:
+
+```bash
+# Position tracker (Flask server - Port 5000)
+sudo systemctl status luanti-tracker-postgresql
+sudo systemctl restart luanti-tracker-postgresql
+
+# Map renderer (auto-render every 15s)
+sudo systemctl status luanti-map-render
+sudo systemctl restart luanti-map-render
+
+# Map HTTP server (serves map.png - Port 8080)
+sudo systemctl status luanti-map-server
+sudo systemctl restart luanti-map-server
 ```
 
 ## API Endpoints

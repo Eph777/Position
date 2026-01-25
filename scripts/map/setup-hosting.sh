@@ -17,7 +17,7 @@ fi
 SERVICE_USER=$(get_current_user)
 USER_HOME=$(get_user_home)
 PROJECT_ROOT=$(get_project_root)
-MAP_OUTPUT_DIR="$USER_HOME/luanti-qgis/map_output"
+MAP_OUTPUT_DIR="$PROJECT_ROOT/map_output"
 
 # Ensure directories exist and have correct permissions
 if [ ! -d "$PROJECT_ROOT" ]; then
