@@ -1,15 +1,17 @@
 #!/bin/bash
 # Setup map hosting services (renderer + HTTP server)
-# Usage: ./setup-hosting.sh <world_name>
+# Usage: ./setup-hosting.sh <world_name> [map_port]
 
 # Load common functions
 PROJECT_ROOT=$(cat /root/.proj_root)
 source $PROJECT_ROOT/src/lib/common.sh
 
 WORLD="$1"
+MAP_PORT="${2:-8080}"  # Default to 8080 if not specified
 
 if [ -z "$WORLD" ]; then
-    print_error "Usage: $0 <world_name>"
+    print_error "Usage: $0 <world_name> [map_port]"
+    echo "  Default port: 8080"
     exit 1
 fi
 
@@ -53,22 +55,22 @@ EOF
 print_info "Creating luanti-map-server.service..."
 sudo tee /etc/systemd/system/luanti-map-server.service > /dev/null <<EOF
 [Unit]
-Description=Luanti Map HTTP Server (Port 8080)
+Description=Luanti Map HTTP Server (Port ${MAP_PORT})
 
 [Service]
 Type=simple
 User=${SERVICE_USER}
 WorkingDirectory=$MAP_OUTPUT_DIR
-ExecStart=/usr/bin/python3 $PROJECT_ROOT/src/range_server.py 8080
+ExecStart=/usr/bin/python3 $PROJECT_ROOT/src/range_server.py ${MAP_PORT}
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# Open Firewall Port 8080
-print_info "Opening port 8080..."
-sudo ufw allow 8080/tcp
+# Open Firewall Port
+print_info "Opening port ${MAP_PORT}..."
+sudo ufw allow ${MAP_PORT}/tcp
 
 # Start Services
 print_info "Starting services..."
@@ -79,4 +81,4 @@ sudo systemctl enable luanti-map-server
 sudo systemctl start luanti-map-server
 
 print_info "Map services started successfully!"
-echo "Map is now hosted at: http://$(hostname -I | awk '{print $1}'):8080/map.png"
+echo "Map is now hosted at: http://$(hostname -I | awk '{print $1}'):${MAP_PORT}/map.png"

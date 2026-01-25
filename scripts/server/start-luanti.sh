@@ -79,7 +79,7 @@ if [ -n "$MAP_PORT" ]; then
     
     # Run map hosting setup script
     print_info "Configuring map services..."
-    "$PROJECT_ROOT/scripts/map/setup-hosting.sh" "$WORLD" || {
+    "$PROJECT_ROOT/scripts/map/setup-hosting.sh" "$WORLD" "$MAP_PORT" || {
         print_error "Failed to setup map services"
         exit 1
     }
