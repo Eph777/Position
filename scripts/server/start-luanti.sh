@@ -1,8 +1,9 @@
 #!/bin/bash
 # Start Luanti game server
-# Usage: ./start-luanti.sh <world_name> [port] [--service]
+# Usage: ./start-luanti.sh <world_name> [port] [--service] [--map MAP_PORT]
 #   Without --service: Runs in foreground
 #   With --service: Creates and starts systemd service
+#   With --map PORT: Also starts map rendering and hosting services on specified port
 
 # Load common functions
 PROJECT_ROOT=$(cat /root/.proj_root)
@@ -11,20 +12,26 @@ source $PROJECT_ROOT/src/lib/common.sh
 WORLD="$1"
 PORT="${2:-30000}"
 IS_SERVICE=false
+MAP_PORT=""
+
+# Open firewall for game server port
+sudo ufw allow "$PORT/udp"
 
 # Parse arguments
 shift 2 2>/dev/null || shift $#
 while [[ $# -gt 0 ]]; do
     case $1 in
         --service) IS_SERVICE=true; shift ;;
+        --map) MAP_PORT="$2"; shift 2 ;;
         *) shift ;;
     esac
 done
 
 if [ -z "$WORLD" ]; then
-    print_error "Usage: $0 <world_name> [port] [--service]"
+    print_error "Usage: $0 <world_name> [port] [--service] [--map MAP_PORT]"
     echo "  Without --service: Runs in foreground"
     echo "  With --service: Creates and starts systemd service"
+    echo "  With --map PORT: Also starts map rendering and hosting on specified port"
     exit 1
 fi
 
@@ -60,6 +67,34 @@ if [ "$IS_SERVICE" = true ]; then
     check_port "$PORT" --kill --force || exit 1
 else
     check_port "$PORT" --kill || exit 1
+fi
+
+# Setup map services if --map is specified
+if [ -n "$MAP_PORT" ]; then
+    print_info "Setting up map rendering and hosting services on port $MAP_PORT..."
+    
+    # Open firewall for map server
+    print_info "Opening firewall port $MAP_PORT/tcp..."
+    sudo ufw allow "$MAP_PORT/tcp"
+    
+    # Run map hosting setup script
+    print_info "Configuring map services..."
+    "$PROJECT_ROOT/scripts/map/setup-hosting.sh" "$WORLD" || {
+        print_error "Failed to setup map services"
+        exit 1
+    }
+    
+    # Verify services are running
+    sleep 2
+    if systemctl is-active --quiet luanti-map-render && systemctl is-active --quiet luanti-map-server; then
+        print_info "Map services started successfully!"
+        print_info "Map will be available at: http://$(hostname -I | awk '{print $1}'):$MAP_PORT/map.png"
+    else
+        print_warning "Map services may not have started correctly. Check with:"
+        echo "  sudo systemctl status luanti-map-render"
+        echo "  sudo systemctl status luanti-map-server"
+    fi
+    echo ""
 fi
 
 # Service mode: Create and start systemd service

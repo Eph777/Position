@@ -206,6 +206,18 @@ MAP_RENDER_INTERVAL=15
 ./scripts/server/start-luanti.sh myworld 30000 --service
 ```
 
+#### With Map Hosting
+```bash
+# Start server with automatic map rendering and hosting
+~/start-luanti.sh myworld 30000 --service --map 8080
+
+# This will:
+# - Start the Luanti game server
+# - Setup and start map renderer (auto-render every 15s)
+# - Setup and start map HTTP server on port 8080
+# - Open firewall ports automatically
+```
+
 When started as a service, you get:
 - Automatic restart on failure
 - Persistent logs via journalctl
