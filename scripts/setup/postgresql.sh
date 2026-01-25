@@ -274,8 +274,7 @@ print_info "Firewall configured!"
 
 # Step 9: Create Luanti server start script
 print_info "Step 9/9: Creating Luanti server start script..."
-cp "$PROJECT_ROOT/scripts/server/start-luanti.sh" "${USER_HOME}/sls"
-chmod +x "${USER_HOME}/sls"
+ln -sf "$PROJECT_ROOT/scripts/server/start-luanti.sh" "${USER_HOME}/start-luanti.sh"
 
 print_info "Luanti server start script created!"
 
