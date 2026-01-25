@@ -9,9 +9,9 @@
 set -e  # Exit on error
 
 # Load common functions
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-source "$PROJECT_ROOT/src/lib/common.sh"
+echo $(cd ../ && pwd) > /root/.proj_root
+PROJECT_ROOT=$(cat /root/.proj_root)
+source $PROJECT_ROOT/src/lib/common.sh
 
 # Default values
 AUTO=false

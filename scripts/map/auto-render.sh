@@ -3,8 +3,9 @@
 # Usage: ./auto-render.sh <world_name> [interval_seconds]
 
 # Load common functions
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../../src/lib/common.sh"
+echo $(cd ../../ && pwd) > /root/.proj_root
+PROJECT_ROOT=$(cat /root/.proj_root)
+source $PROJECT_ROOT/src/lib/common.sh
 
 WORLD="$1"
 INTERVAL="${2:-15}"  # Default 15 seconds

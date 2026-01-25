@@ -70,7 +70,6 @@ luanti-position-tracker/
 │   ├── setup/
 │   │   ├── postgresql.sh      # Database setup
 │   │   ├── mapper.sh          # Map renderer setup
-│   │   └── express.sh         # Quick setup (all-in-one)
 │   ├── server/
 │   │   ├── start-luanti.sh    # Start game server
 │   │   ├── migrate-backend.sh # Backend migration

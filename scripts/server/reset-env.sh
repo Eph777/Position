@@ -3,10 +3,10 @@
 # Usage: ./reset-env.sh [--force]
 
 # Load common functions
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../../src/lib/common.sh"
+echo $(cd ../../ && pwd) > /root/.proj_root
+PROJECT_ROOT=$(cat /root/.proj_root)
+source $PROJECT_ROOT/src/lib/common.sh
 
-PROJECT_ROOT=$(get_project_root)
 WORLDS_DATA_DIR="$PROJECT_ROOT/worlds_data"
 FORCE=false
 
