@@ -1,47 +1,47 @@
 #!/bin/bash
+# Copyright (C) 2026 Ephraim BOURIAHI
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# Luanti Position Tracker - Automated PostgreSQL Setup Script
-# This script automates the entire server setup process for PostgreSQL
+# PostgreSQL setup for Luanti/QGIS
+# Usage: ./postgresql.sh [--auto]
 
-set -e  # Exit on any error
+# Load common functions
+PROJECT_ROOT=$(cat /root/.proj_root)
+source $PROJECT_ROOT/src/lib/common.sh
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
 
-# Function to print colored output
-print_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-# Determine if running as root
-if [ "$EUID" -eq 0 ]; then
-    print_warning "Running as root user."
-    USER_HOME="/root"
-    CURRENT_USER="root"
-else
-    USER_HOME="$HOME"
-    CURRENT_USER=$(whoami)
-fi
+# Parse arguments
+AUTO=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --auto) AUTO=true; shift ;;
+        *) shift ;;
+    esac
+done
 
 # Configuration
 DB_NAME="luanti_db"
 DB_USER="luanti"
 DB_PASS="postgres123"
-PROJECT_DIR="${USER_HOME}/luanti-qgis"
 PYTHON_VERSION="python3"
 
-print_info "=== Luanti Position Tracker - PostgreSQL Setup ==="
+USER_HOME=$(get_user_home)
+CURRENT_USER=$(get_current_user)
+PROJECT_ROOT=$(get_project_root)
+
+print_info "=== Luanti/QGIS - PostgreSQL Setup ==="
 echo ""
 print_warning "This script will:"
 echo "  1. Update system packages"
@@ -52,11 +52,9 @@ echo "  5. Install Luanti server and game content"
 echo "  6. Configure systemd service"
 echo "  7. Set up firewall"
 echo ""
-read -p "Do you want to continue? (y/n) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    print_info "Setup cancelled."
-    exit 0
+
+if [ "$AUTO" = false ]; then
+    confirm "Do you want to continue?" || exit 0
 fi
 
 # Step 1: Update system
@@ -78,7 +76,6 @@ print_info "Step 4/9: Configuring PostgreSQL..."
 # Configure authentication method
 print_info "Configuring PostgreSQL authentication..."
 PG_HBA_CONF=$(sudo -u postgres psql -t -P format=unaligned -c 'SHOW hba_file;')
-PG_HBA_CONF=$(sudo -u postgres psql -t -P format=unaligned -c 'SHOW hba_file;')
 PG_CONF_FILE=$(sudo -u postgres psql -t -P format=unaligned -c 'SHOW config_file;')
 print_info "PostgreSQL pg_hba.conf file: $PG_HBA_CONF"
 print_info "PostgreSQL postgresql.conf file: $PG_CONF_FILE"
@@ -87,11 +84,9 @@ print_info "PostgreSQL postgresql.conf file: $PG_CONF_FILE"
 sudo cp "$PG_HBA_CONF" "${PG_HBA_CONF}.backup"
 
 # Update pg_hba.conf to use scram-sha-256 authentication for local connections
-# Replace 'peer' or 'md5' with 'scram-sha-256'
 sudo sed -i 's/^local\s\+all\s\+all\s\+\(peer\|md5\).*/local   all             all                                     scram-sha-256/' "$PG_HBA_CONF"
 
-# Also allow remote connections (since we are enabling listen_addresses = '*')
-# CAUTION: This allows access from ANY IP. For production, restrict '0.0.0.0/0' to your specific subnet.
+# Allow remote connections
 if ! grep -q "host    all             all             0.0.0.0/0               scram-sha-256" "$PG_HBA_CONF"; then
     echo "host    all             all             0.0.0.0/0               scram-sha-256" | sudo tee -a "$PG_HBA_CONF"
 fi
@@ -99,7 +94,6 @@ fi
 # Configure postgresql.conf to listen on all addresses
 print_info "Configuring postgresql.conf to listen on all addresses..."
 sudo cp "$PG_CONF_FILE" "${PG_CONF_FILE}.backup"
-# Check if listen_addresses is already set, if so replace it, otherwise append it
 if grep -q "^listen_addresses" "$PG_CONF_FILE"; then
     sudo sed -i "s/^listen_addresses = .*/listen_addresses = '*'/" "$PG_CONF_FILE"
 else
@@ -116,7 +110,7 @@ print_info "PostgreSQL authentication configured!"
 print_info "Creating database and user..."
 
 # Stop service to ensure no active DB connections prevent the drop
-sudo systemctl stop luanti-tracker-postgresql || true
+sudo systemctl stop luanti-tracker-postgresql 2>/dev/null || true
 
 sudo -u postgres psql <<EOF
 -- Ensure password is hashed with SCRAM-SHA-256 to match pg_hba.conf
@@ -150,13 +144,7 @@ print_info "PostgreSQL configuration complete!"
 # Step 5: Set up Python application
 print_info "Step 5/9: Setting up Python application..."
 
-if [ ! -d "$PROJECT_DIR" ]; then
-    print_error "Project directory $PROJECT_DIR not found!"
-    print_info "Please upload your Position folder to $PROJECT_DIR and run this script again."
-    exit 1
-fi
-
-cd "$PROJECT_DIR"
+cd "$PROJECT_ROOT"
 
 # Create virtual environment
 print_info "Creating Python virtual environment..."
@@ -208,10 +196,8 @@ echo "load_mod_position_tracker = true" >> ${USER_HOME}/snap/luanti/common/.mine
 
 # Copy mod
 print_info "Installing or updating position tracker mod..."
-# Ensure destination exists
 mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker
-# Copy contents (force overwrite)
-cp -r "$PROJECT_DIR/mod/"* ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker/
+cp -r "$PROJECT_ROOT/mod/"* ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker/
 
 # Configure mod
 print_info "Configuring mod..."
@@ -226,44 +212,31 @@ print_info "Luanti setup complete!"
 print_info "Step 7/9: Checking for port conflicts..."
 
 # Check if port 5000 is in use
-PORT_IN_USE=$(sudo lsof -i :5000 -t 2>/dev/null || true)
-
-if [ ! -z "$PORT_IN_USE" ]; then
-    print_warning "Port 5000 is already in use!"
-    
-    # Try to identify the process
-    PROCESS_INFO=$(sudo lsof -i :5000 | grep LISTEN)
-    echo "$PROCESS_INFO"
-    
+if ! check_port 5000; then
     # Check if it's the MySQL tracker service
     if systemctl is-active --quiet luanti-tracker; then
         print_warning "Found MySQL tracker service running on port 5000."
-        echo ""
-        read -p "Do you want to stop the MySQL service and continue with PostgreSQL? (y/n) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            print_info "Stopping MySQL tracker service..."
+        if [ "$AUTO" = true ]; then
+            print_info "Auto mode: Stopping MySQL tracker service..."
             sudo systemctl stop luanti-tracker
             sudo systemctl disable luanti-tracker
-            print_info "MySQL service stopped."
         else
-            print_error "Cannot proceed while port 5000 is in use. Exiting."
-            exit 1
+            if confirm "Do you want to stop the MySQL service and continue with PostgreSQL?"; then
+                print_info "Stopping MySQL tracker service..."
+                sudo systemctl stop luanti-tracker
+                sudo systemctl disable luanti-tracker
+                print_info "MySQL service stopped."
+            else
+                print_error "Cannot proceed while port 5000 is in use."
+                exit 1
+            fi
         fi
     else
         # Unknown process on port 5000
-        print_warning "An unknown process is using port 5000."
-        echo ""
-        read -p "Do you want to kill this process and continue? (y/n) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            print_info "Stopping process on port 5000..."
-            sudo kill -9 $PORT_IN_USE
-            sleep 2
-            print_info "Process stopped."
+        if [ "$AUTO" = true ]; then
+            check_port 5000 --kill --force || exit 1
         else
-            print_error "Cannot proceed while port 5000 is in use. Exiting."
-            exit 1
+            check_port 5000 --kill || exit 1
         fi
     fi
 fi
@@ -272,16 +245,16 @@ print_info "Creating systemd service..."
 
 sudo tee /etc/systemd/system/luanti-tracker-postgresql.service > /dev/null <<EOF
 [Unit]
-Description=Luanti Player Position Tracker (PostgreSQL)
+Description=Luanti/QGIS (PostgreSQL)
 After=network.target postgresql.service
 
 [Service]
 Type=simple
 User=${CURRENT_USER}
-WorkingDirectory=$PROJECT_DIR
-Environment="PATH=$PROJECT_DIR/venv/bin"
-EnvironmentFile=$PROJECT_DIR/.env
-ExecStart=$PROJECT_DIR/venv/bin/python3 $PROJECT_DIR/server.py
+WorkingDirectory=$PROJECT_ROOT
+Environment="PATH=$PROJECT_ROOT/venv/bin"
+EnvironmentFile=$PROJECT_ROOT/.env
+ExecStart=$PROJECT_ROOT/venv/bin/python3 $PROJECT_ROOT/src/server.py
 Restart=always
 RestartSec=10
 
@@ -317,50 +290,7 @@ print_info "Firewall configured!"
 
 # Step 9: Create Luanti server start script
 print_info "Step 9/9: Creating Luanti server start script..."
-cp $PROJECT_DIR/sls.sh ${USER_HOME}/sls
-chmod +x ${USER_HOME}/sls
-
-# cat > ${USER_HOME}/sls <<'EOF'
-# #!/bin/bash
-# # This script will setup the map hosting and then start the Luanti server
-# ~/luanti-qgis/setup_map_hosting.sh
-# /snap/bin/luanti --server --world ~/snap/luanti/common/.minetest/worlds/myworld --gameid minetest_game --port 30000
-# EOF
-# cat > ${USER_HOME}/sls <<'EOF'
-# #!/bin/bash
-# # This script will setup the map hosting and then start the Luanti server
-# PORT=$2
-# WORLD="$1"
-
-# print_info "Setting up map hosting..."
-# ~/luanti-qgis/setup_map_hosting.sh
-
-# PORT_IN_USE=$(sudo lsof -i :$PORT -t 2>/dev/null || true)
-
-# if [ ! -z "$PORT_IN_USE" ]; then
-#     print_warning "Port $PORT is already in use!"
-    
-#     PROCESS_INFO=$(sudo lsof -i :$PORT | grep LISTEN)
-#     echo "$PROCESS_INFO"
-    
-#     echo ""
-#     read -p "Do you want to kill this process and continue? (y/n) " -n 1 -r
-#     echo
-#     if [[ $REPLY =~ ^[Yy]$ ]]; then
-#         print_info "Stopping process on port $PORT..."
-#         sudo kill -9 $PORT_IN_USE
-#         sleep 2
-#         print_info "Process stopped."
-#     else
-#         print_error "Cannot proceed while port $PORT is in use. Exiting."
-#         exit 1
-#     fi
-# fi
-
-# /snap/bin/luanti --server --world ~/snap/luanti/common/.minetest/worlds/$WORLD --gameid minetest_game --port $PORT
-# EOF
-
-# chmod +x ${USER_HOME}/sls
+ln -sf "$PROJECT_ROOT/scripts/server/start-luanti.sh" "${USER_HOME}/start-luanti.sh"
 
 print_info "Luanti server start script created!"
 
@@ -386,13 +316,13 @@ echo "3. Verify data in PostgreSQL:"
 echo "   PGPASSWORD=${DB_PASS} psql -U ${DB_USER} -d ${DB_NAME} -c \"SELECT * FROM player_traces;\""
 echo ""
 echo "4. Start Luanti server:"
-echo "   ~/sls"
+echo "   ~/sls myworld 30000"
 echo ""
 echo "5. Connect from your Luanti client to:"
 echo "   Server IP: $(hostname -I | awk '{print $1}')"
 echo "   Port: 30000"
 echo ""
-print_info "Configuration details saved in: $PROJECT_DIR/.env"
+print_info "Configuration details saved in: $PROJECT_ROOT/.env"
 print_info "PostgreSQL User: ${DB_USER}"
 print_info "PostgreSQL Password: ${DB_PASS}"
 echo ""

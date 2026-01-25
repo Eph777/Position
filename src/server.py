@@ -1,3 +1,18 @@
+# Copyright (C) 2026 Ephraim BOURIAHI
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import os
 import datetime
 from flask import Flask, request, jsonify
@@ -29,17 +44,17 @@ except (Exception, psycopg2.DatabaseError) as error:
     print(f"Error while connecting to PostgreSQL: {error}")
 
 @app.route('/position', methods=['POST'])
-
 def log_position():
     """
     Receives position data from Luanti mod.
-    Expected JSON: {"player": "name", "pos": {"x": 1.0, "y": 2.0, "z": 3.0}}
+    Expected JSON: {"player": "name", "world": "worldname", "pos": {"x": 1.0, "y": 2.0, "z": 3.0}}
     """
     data = request.json
     if not data or 'player' not in data or 'pos' not in data:
         return jsonify({"error": "Invalid data format"}), 400
 
     player = data['player']
+    world = data.get('world', 'default')  # Default world if not specified
     pos = data['pos']
     x = pos.get('x', 0)
     y = pos.get('y', 0)
@@ -51,10 +66,10 @@ def log_position():
         conn = postgresql_pool.getconn()
         cursor = conn.cursor()
         query = """
-            INSERT INTO player_traces (player_name, x, y, z)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO player_traces (player_name, world_name, x, y, z)
+            VALUES (%s, %s, %s, %s, %s)
         """
-        cursor.execute(query, (player, x, y, z))
+        cursor.execute(query, (player, world, x, y, z))
         conn.commit()
         
         # 3. Success response immediately (don't let cleanup block this)
@@ -70,8 +85,8 @@ def log_position():
             # Lazy Cleanup: Archive "stale" records (older than 60s)
             cleanup_query = """
                 WITH moved_rows AS (
-                    INSERT INTO player_traces_archive (player_name, x, y, z, timestamp)
-                    SELECT player_name, x, y, z, timestamp
+                    INSERT INTO player_traces_archive (player_name, world_name, x, y, z, timestamp)
+                    SELECT player_name, world_name, x, y, z, timestamp
                     FROM player_traces
                     WHERE timestamp < NOW() - INTERVAL '60 seconds'
                     RETURNING player_name
@@ -116,8 +131,8 @@ def logout_player():
         
         # 1. Copy to archive
         archive_query = """
-            INSERT INTO player_traces_archive (player_name, x, y, z, timestamp)
-            SELECT player_name, x, y, z, timestamp
+            INSERT INTO player_traces_archive (player_name, world_name, x, y, z, timestamp)
+            SELECT player_name, world_name, x, y, z, timestamp
             FROM player_traces
             WHERE player_name = %s
         """
@@ -150,9 +165,11 @@ def get_traces():
     Retrieves player traces from the database.
     Optional query parameters:
     - player: filter by player name
+    - world: filter by world name
     - limit: number of records to return (default: 100)
     """
     player_name = request.args.get('player')
+    world_name = request.args.get('world')
     limit = request.args.get('limit', 100, type=int)
     
     conn = None
@@ -160,18 +177,36 @@ def get_traces():
         conn = postgresql_pool.getconn()
         cursor = conn.cursor()
         
-        if player_name:
+        if player_name and world_name:
             query = """
-                SELECT id, player_name, x, y, z, timestamp
+                SELECT id, player_name, world_name, x, y, z, timestamp
+                FROM player_traces
+                WHERE player_name = %s AND world_name = %s
+                ORDER BY timestamp DESC
+                LIMIT %s
+            """
+            cursor.execute(query, (player_name, world_name, limit))
+        elif player_name:
+            query = """
+                SELECT id, player_name, world_name, x, y, z, timestamp
                 FROM player_traces
                 WHERE player_name = %s
                 ORDER BY timestamp DESC
                 LIMIT %s
             """
             cursor.execute(query, (player_name, limit))
+        elif world_name:
+            query = """
+                SELECT id, player_name, world_name, x, y, z, timestamp
+                FROM player_traces
+                WHERE world_name = %s
+                ORDER BY timestamp DESC
+                LIMIT %s
+            """
+            cursor.execute(query, (world_name, limit))
         else:
             query = """
-                SELECT id, player_name, x, y, z, timestamp
+                SELECT id, player_name, world_name, x, y, z, timestamp
                 FROM player_traces
                 ORDER BY timestamp DESC
                 LIMIT %s
@@ -187,16 +222,45 @@ def get_traces():
             traces.append({
                 "id": row[0],
                 "player_name": row[1],
-                "x": row[2],
-                "y": row[3],
-                "z": row[4],
-                "timestamp": row[5].isoformat() if row[5] else None
+                "world_name": row[2],
+                "x": row[3],
+                "y": row[4],
+                "z": row[5],
+                "timestamp": row[6].isoformat() if row[6] else None
             })
         
         return jsonify({"count": len(traces), "traces": traces}), 200
     except (Exception, psycopg2.DatabaseError) as error:
         print(f"Error retrieving traces: {error}")
         return jsonify({"error": "Database error"}), 500
+    finally:
+        if conn:
+            postgresql_pool.putconn(conn)
+
+@app.route('/create_world_view/<world>', methods=['POST'])
+def create_world_view(world):
+    """
+    Creates a QGIS view for a specific world.
+    Example: POST /create_world_view/production
+    """
+    conn = None
+    try:
+        conn = postgresql_pool.getconn()
+        cursor = conn.cursor()
+        
+        # Call the PostgreSQL function to create the view
+        cursor.execute("SELECT create_world_view(%s)", (world,))
+        result = cursor.fetchone()[0]
+        
+        conn.commit()
+        cursor.close()
+        
+        return jsonify({"status": "success", "message": result}), 201
+    except (Exception, psycopg2.DatabaseError) as error:
+        if conn:
+            conn.rollback()
+        print(f"Error creating view: {error}")
+        return jsonify({"error": str(error)}), 500
     finally:
         if conn:
             postgresql_pool.putconn(conn)

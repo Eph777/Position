@@ -1,129 +1,297 @@
-# Luanti Player Position Tracker
+# Luanti/QGIS
 
-A system for tracking and storing player positions from a Luanti (formerly Minetest) game server using **PostgreSQL**.
+A comprehensive system for tracking and storing player positions from a Luanti (formerly Minetest) game server using **PostgreSQL**, with real-time map rendering and HTTP hosting capabilities.
 
 > [!NOTE]
-> This project uses **PostgreSQL** for data storage, leveraging its advanced GIS capabilities (PostGIS) for efficient spatial tracking.
+> This project uses **PostgreSQL** with PostGIS for advanced GIS capabilities and efficient spatial tracking.
 
-## System Architecture
+## Features
 
-```
-Luanti Game Server (with mod) → Python Flask Server → PostgreSQL Database
-```
-
-The system consists of three components:
-
-1. **Luanti Mod** (`mod/`): Tracks player positions every second and sends them to the Flask server
-2. **Python Flask Server** (`server.py`): Receives HTTP requests and stores data in PostgreSQL
-3. **PostgreSQL Database**: Stores player position traces with timestamps
+- 🎮 **Real-time Position Tracking**: Captures player positions every second via Luanti mod
+- 🗺️ **Auto Map Rendering**: Generates map images every 15 seconds
+- 🌐 **HTTP Map Server**: Serves rendered maps via HTTP for QGIS integration
+- 📊 **PostgreSQL Database**: Robust data storage with spatial extensions
+- 🚀 **One-Command Deployment**: Unified deployment script for production
+- 🔄 **Auto-Archiving**: Intelligent data management with live/archive tables
 
 ## Quick Start
 
 ### Prerequisites
 
-- Python 3.8+
-- PostgreSQL 12+ (with PostGIS extension)
-- Luanti game server
+- Ubuntu 20.04+ or Debian 11+
+- 2GB RAM minimum (4GB recommended)
+- Root or sudo access
 
 ### Installation
 
-1. **Clone the repository**:
-   ```bash
-   cd ~/Position
-   ```
-
-2. **Install Python dependencies**:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
-
-3. **Set up PostgreSQL database**:
-   ```bash
-   chmod +x setup_postgresql.sh
-   ./setup_postgresql.sh
-   ```
-   Or follow the manual [SETUP_GUIDE.md](SETUP_GUIDE.md).
-
-4. **Run the Flask server**:
-   ```bash
-   export $(cat .env | xargs)
-   python3 server.py
-   ```
-
-### Luanti Mod Installation
-
-1. Copy the `mod` folder to your Luanti mods directory:
-   ```bash
-   cp -r mod ~/.luanti/mods/position_tracker
-   ```
-
-2. Edit `~/.luanti/mods/position_tracker/init.lua` and update `SERVER_URL`:
-   ```lua
-   local SERVER_URL = "http://your_server_ip:5000/position"
-   ```
-
-3. Enable HTTP for the mod in `~/.luanti/minetest.conf`:
-   ```ini
-   secure.http_mods = position_tracker
-   ```
-
-4. Enable the mod in your world's `world.mt` file:
-   ```
-   load_mod_position_tracker = true
-   ```
-
-## Documentation
-
-- **[SETUP_GUIDE.md](SETUP_GUIDE.md)**: Comprehensive setup guide with step-by-step instructions for remote deployment
-- **[schema.sql](schema.sql)**: PostgreSQL database schema
-- **[.env.example](.env.example)**: Environment variable template
-
-## Usage
-
-Once everything is set up:
-
-1. Start the Flask server (or systemd service on production)
-2. Start your Luanti server with the mod enabled
-3. Connect with Luanti client and play
-4. Player positions are automatically tracked and stored in PostgreSQL
-
-### Querying Data
-
-Connect to PostgreSQL and query player traces:
-
 ```bash
-psql -U luanti -d luanti_db
+# Clone the repository
+git clone <repository-url>
+cd luanti-position-tracker
+
+# Run unified deployment (interactive)
+./bin/deploy.sh
+
+# Or for production (non-interactive)
+./bin/deploy.sh --auto --world myworld
 ```
 
-```sql
--- View recent traces
-SELECT * FROM player_traces ORDER BY timestamp DESC LIMIT 10;
+That's it! The deployment script will:
+1. ✅ Install PostgreSQL and all dependencies
+2. ✅ Set up Python Flask server
+3. ✅ Install Luanti game server
+4. ✅ Compile map renderer
+5. ✅ Configure systemd services
+6. ✅ Set up firewall rules
 
--- Count traces by player
-SELECT player_name, COUNT(*) as trace_count 
-FROM player_traces 
-GROUP BY player_name;
+### Start Playing
+
+```bash
+# Start Luanti server
+~/sls myworld 30000
+
+# Connect from your Luanti client
+# Server: <your-server-ip>
+# Port: 30000
+```
+
+## Repository Structure
+
+```
+luanti-position-tracker/
+├── bin/
+│   └── deploy.sh              # Unified deployment script
+├── src/
+│   ├── server.py              # Flask position tracker
+│   ├── range_server.py        # HTTP map server
+│   └── lib/
+│       └── common.sh          # Shared bash utilities
+├── scripts/
+│   ├── setup/
+│   │   ├── postgresql.sh      # Database setup
+│   │   ├── mapper.sh          # Map renderer setup
+│   ├── server/
+│   │   ├── start-luanti.sh    # Start game server
+│   │   ├── migrate-backend.sh # Backend migration
+│   │   └── reset-env.sh       # Environment reset
+│   └── map/
+│       ├── render.sh          # Render map once  
+│       ├── auto-render.sh     # Auto-render loop
+│       └── setup-hosting.sh   # Setup map hosting
+├── config/
+│   └── .env.example           # Configuration template
+├── mod/
+│   ├── init.lua               # Luanti/QGIS mod
+│   └── mod.conf               # Mod configuration
+├── schema.sql                 # PostgreSQL schema
+├── requirements.txt           # Python dependencies
+├── README.md                  # This file
+└── DEPLOYMENT.md              # Detailed deployment guide
+```
+
+## System Architecture
+
+```
+┌─────────────────┐
+│  Luanti Server  │
+│   (with mod)    │
+└────────┬────────┘
+         │ HTTP POST
+         │ /position
+         ▼
+┌─────────────────┐      ┌──────────────────┐
+│  Flask Server   │─────▶│   PostgreSQL     │
+│  (port 5000)    │      │   Database       │
+└─────────────────┘      └──────────────────┘
+                                   │
+                                   │ Read
+                                   ▼
+┌─────────────────┐      ┌──────────────────┐
+│  Map Renderer   │─────▶│  Map HTTP Server │
+│  (auto-render)  │      │   (port 8080)    │
+└─────────────────┘      └──────────────────┘
+         │                        │
+         │                        │
+         ▼                        ▼
+    map.png                   QGIS/Browser
+```
+
+## Deployment Options
+
+### Interactive Setup
+```bash
+./bin/deploy.sh
+```
+Prompts for confirmation at each step. Best for first-time setup.
+
+### Automated Setup (Production)
+```bash
+./bin/deploy.sh --auto --world production
+```
+Non-interactive deployment. Perfect for CI/CD or remote servers.
+
+### Update Existing Deployment
+```bash
+./bin/deploy.sh --update
+```
+Pulls latest code, updates dependencies, and restarts services.
+
+### Check Status
+```bash
+./bin/deploy.sh --status
+```
+Shows status of all services and components.
+
+## Manual Setup
+
+If you prefer granular control:
+
+```bash
+# 1. Setup PostgreSQL
+./scripts/setup/postgresql.sh
+
+# 2. Migrate world backend
+./scripts/server/migrate-backend.sh myworld
+
+# 3. Setup map renderer
+./scripts/setup/mapper.sh myworld
+
+# 4. Setup map hosting
+./scripts/map/setup-hosting.sh myworld
+```
+
+## Configuration
+
+Edit `.env` in the project root:
+
+```bash
+# Database
+DB_HOST=localhost
+DB_NAME=luanti_db
+DB_USER=luanti
+DB_PASS=postgres123
+DB_PORT=5432
+
+# Servers
+FLASK_PORT=5000
+LUANTI_PORT=30000
+MAP_SERVER_PORT=8080
+
+# Map rendering
+MAP_RENDER_INTERVAL=15
+```
+
+> [!WARNING]
+> Change default passwords before deploying to production!
+
+## Service Management
+
+### Starting Luanti Server
+
+#### Foreground Mode (Interactive)
+```bash
+# Start server in foreground (Ctrl+C to stop)
+~/start-luanti.sh myworld 30000
+
+# Or using the script directly
+./scripts/server/start-luanti.sh myworld 30000
+```
+
+#### Service Mode (Background)
+```bash
+# Start as systemd service (runs in background)
+~/start-luanti.sh myworld 30000 --service
+
+# Or using the script directly
+./scripts/server/start-luanti.sh myworld 30000 --service
+```
+
+#### With Map Hosting
+```bash
+# Start server with automatic map rendering and hosting
+~/start-luanti.sh myworld 30000 --service --map 8080
+
+# This will:
+# - Start the Luanti game server
+# - Setup and start map renderer (auto-render every 15s)
+# - Setup and start map HTTP server on port 8080
+# - Open firewall ports automatically
+```
+
+When started as a service, you get:
+- Automatic restart on failure
+- Persistent logs via journalctl
+- Starts automatically on boot
+- Runs in background
+
+**Service Management:**
+```bash
+# Check service status
+sudo systemctl status luanti-server@myworld
+
+# Stop service
+sudo systemctl stop luanti-server@myworld
+
+# Restart service
+sudo systemctl restart luanti-server@myworld
+
+# View logs
+sudo journalctl -u luanti-server@myworld -f
+
+# Disable auto-start
+sudo systemctl disable luanti-server@myworld
+```
+
+### View Logs
+
+```bash
+# Flask server logs
+sudo journalctl -u luanti-tracker-postgresql -f
+
+# Map render logs
+sudo journalctl -u luanti-map-render -f
+
+# Map server logs
+sudo journalctl -u luanti-map-server -f
+
+# Luanti game server logs
+sudo journalctl -u luanti-server@myworld -f
+```
+
+### Automated Background Services
+
+Three additional services are created automatically by the deployment:
+
+```bash
+# Position tracker (Flask server - Port 5000)
+sudo systemctl status luanti-tracker-postgresql
+sudo systemctl restart luanti-tracker-postgresql
+
+# Map renderer (auto-render every 15s)
+sudo systemctl status luanti-map-render
+sudo systemctl restart luanti-map-render
+
+# Map HTTP server (serves map.png - Port 8080)
+sudo systemctl status luanti-map-server
+sudo systemctl restart luanti-map-server
 ```
 
 ## API Endpoints
 
-### `GET /`
-Health check endpoint.
-
-**Response:**
-```json
-{"status": "running"}
+### Health Check
+```bash
+GET /
 ```
+Returns: `{"status": "running"}`
 
-### `POST /position`
-Log player position.
+### Log Position
+```bash
+POST /position
+Content-Type: application/json
 
-**Request:**
-```json
 {
   "player": "player_name",
+  "world": "world_name",
   "pos": {
     "x": 10.5,
     "y": 20.0,
@@ -131,33 +299,275 @@ Log player position.
   }
 }
 ```
+Returns: `{"status": "success"}`
 
-**Response:**
-```json
-{"status": "success"}
+**Note**: The `world` parameter is automatically sent by the mod. It detects the world name from the minetest world path.
+
+### Get Traces
+```bash
+GET /traces?player=player_name&world=world_name&limit=100
+```
+Returns list of player position traces.
+
+**Query Parameters:**
+- `player` (optional): Filter by player name
+- `world` (optional): Filter by world name
+- `limit` (optional, default: 100): Number of records to return
+
+### Create World View
+```bash
+POST /create_world_view/<world_name>
+```
+Creates a QGIS-ready view for a specific world.
+
+**Example:**
+```bash
+curl -X POST http://localhost:5000/create_world_view/production
 ```
 
-## Production Deployment
+Returns: `{"status": "success", "message": "Created view: view_live_positions_production"}`
 
-For production deployment on a remote server:
+**Note**: This is automatically called when the mod loads, so manual creation is typically not needed.
 
-1. Follow the comprehensive [SETUP_GUIDE.md](SETUP_GUIDE.md)
-2. Set up systemd service for automatic startup
-3. Configure firewall rules
-4. Enable HTTPS with SSL/TLS certificates
-5. Set up regular database backups
-6. Consider using a production WSGI server (Gunicorn)
+### Player Logout
+```bash
+POST /logout
+Content-Type: application/json
+
+{"player": "player_name"}
+```
+Archives player traces.
+
+## Querying Data
+
+### PostgreSQL
+
+```bash
+# Connect to database
+psql -U luanti -d luanti_db
+
+# View live positions
+SELECT * FROM player_traces ORDER BY timestamp DESC LIMIT 10;
+
+# Count traces by player
+SELECT player_name, COUNT(*) as trace_count 
+FROM player_traces 
+GROUP BY player_name;
+
+# View archived data
+SELECT * FROM player_traces_archive 
+WHERE player_name = 'username' 
+ORDER BY timestamp DESC;
+```
+
+### QGIS Integration
+
+#### World-Specific Views
+
+Each world automatically gets its own QGIS view when the mod loads:
+- `view_live_positions` - All worlds combined
+- `view_live_positions_production` - Production world only
+- `view_live_positions_testing` - Testing world only
+- `view_live_positions_<worldname>` - Specific world
+
+**Adding to QGIS:**
+
+1. **Install QGIS**
+
+2. **Add Raster Layer (Map Background)**:
+   - Layer → Add Layer → Add Raster Layer
+   - Source: `http://<server-ip>:8080/map.png`
+   - Configure georeferencing with `map.pgw` world file
+
+3. **Add PostGIS Layer (Player Positions)**:
+   - Layer → Add Layer → Add PostGIS Layers
+   - Create new connection to your PostgreSQL database
+   - Select world-specific view (e.g., `view_live_positions_production`)
+   - Set as point layer
+
+4. **Style the Layer**:
+   - Right-click layer → Properties → Symbology
+   - Add labels with player names
+   - Style points as needed
+
+**Example Multi-World Setup:**
+
+```bash
+# QGIS shows different colors for each world:
+# - view_live_positions_production (red points)
+# - view_live_positions_testing (blue points)
+# - view_live_positions_creative (green points)
+```
+
+**Querying Specific Worlds:**
+
+```sql
+# View all active players in production world
+SELECT * FROM view_live_positions_production;
+
+# Query historical data for a specific world
+SELECT player_name, x, y, z, timestamp 
+FROM player_traces_archive 
+WHERE world_name = 'production' 
+ORDER BY timestamp DESC 
+LIMIT 100;
+```
+
+## Troubleshooting
+
+### Service Won't Start
+
+```bash
+# Check logs
+sudo journalctl -u luanti-tracker-postgresql -n 100
+
+# Verify Python environment
+source venv/bin/activate
+python -c "import psycopg2; print('OK')"
+```
+
+### Port Conflicts
+
+```bash
+# Check what's using port 5000
+sudo lsof -i :5000
+
+# Kill process
+sudo kill -9 <PID>
+
+# Or let deploy script handle it
+./bin/deploy.sh --auto
+```
+
+### Database Connection Issues
+
+```bash
+# Test connection
+PGPASSWORD=postgres123 psql -U luanti -d luanti_db -c "SELECT 1;"
+
+# Check PostgreSQL service
+sudo systemctl status postgresql
+
+# Review authentication
+sudo cat /etc/postgresql/*/main/pg_hba.conf
+```
+
+### Map Not Rendering
+
+```bash
+# Check mapper executable
+ls -la ~/minetest-mapper/minetestmapper
+
+# Test manual render
+./scripts/map/render.sh myworld
+
+# Check render service
+sudo systemctl status luanti-map-render
+sudo journalctl -u luanti-map-render -f
+```
+
+## Backup & Restore
+
+### Database Backup
+
+```bash
+# Backup
+pg_dump -U luanti -d luanti_db > backup_$(date +%Y%m%d).sql
+
+# Restore
+psql -U luanti -d luanti_db < backup_20260125.sql
+```
+
+### World Backup
+
+```bash
+# Backup
+tar -czf world_backup.tar.gz ~/snap/luanti/common/.minetest/worlds/myworld
+
+# Restore
+tar -xzf world_backup.tar.gz -C ~/snap/luanti/common/.minetest/worlds/
+```
+
+## Security
+
+1. **Change Default Passwords**: Edit `.env` and update database passwords
+2. **Restrict PostgreSQL Access**: Edit `pg_hba.conf` to limit IP ranges
+3. **Enable HTTPS**: Use Nginx reverse proxy with Let's Encrypt
+4. **Regular Updates**: Run `./bin/deploy.sh --update` regularly
+5. **Firewall Rules**: Only open required ports
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed security hardening.
+
+## Development
+
+### Running Locally
+
+```bash
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Set environment variables
+export $(cat .env | xargs)
+
+# Run Flask server
+python src/server.py
+```
+
+### Testing Changes
+
+```bash
+# Test position logging
+curl -X POST http://localhost:5000/position \
+  -H "Content-Type: application/json" \
+  -d '{"player":"test","pos":{"x":1,"y":2,"z":3}}'
+
+# Verify in database
+PGPASSWORD=postgres123 psql -U luanti -d luanti_db \
+  -c "SELECT * FROM player_traces;"
+```
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## Documentation
+
+- **[DEPLOYMENT.md](DEPLOYMENT.md)**: Comprehensive production deployment guide
+- **[schema.sql](schema.sql)**: Database schema documentation
+- **[config/.env.example](config/.env.example)**: Configuration options
 
 ## License
 
 This project is open source and available for educational and personal use.
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues or pull requests.
-
 ## Acknowledgments
 
-- Built for Luanti (formerly Minetest): https://www.luanti.org/
-- Uses Flask web framework: https://flask.palletsprojects.com/
-- PostgreSQL: https://www.postgresql.org/
+- Built for [Luanti](https://www.luanti.org/) (formerly Minetest)
+- Uses [Flask](https://flask.palletsprojects.com/) web framework
+- [PostgreSQL](https://www.postgresql.org/) with [PostGIS](https://postgis.net/)
+- Map rendering by [minetestmapper](https://github.com/luanti-org/minetestmapper)
+
+## Support
+
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+For issues:
+1. Check logs: `sudo journalctl -u luanti-tracker-postgresql`
+2. Run status check: `./bin/deploy.sh --status`
+3. Review troubleshooting section above
+4. Open an issue on GitHub
+
+## Contact
+
+Ephraim BOURIAHI - amar-ephraim.bouriahi@etu.u-pec.fr
+Project Link: [https://github.com/Eph777/Position](https://github.com/Eph777/Position)
