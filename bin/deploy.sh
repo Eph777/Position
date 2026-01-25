@@ -24,7 +24,7 @@
 set -e  # Exit on error
 
 # Load common functions
-PROJECT_ROOT=$(dirname $(pwd))
+PROJECT_ROOT=$(dirname $(pwd -P))
 echo $PROJECT_ROOT > /root/.proj_root
 source $PROJECT_ROOT/src/lib/common.sh
 
