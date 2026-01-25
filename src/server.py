@@ -1,10 +1,12 @@
 import os
 import datetime
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 import psycopg2
 from psycopg2 import pool
+import world_manager
 
-app = Flask(__name__)
+# Initialize Flask app with static folder
+app = Flask(__name__, static_folder='../static', static_url_path='/static')
 
 # Database configuration - Update these with your actual credentials
 DB_HOST = os.environ.get("DB_HOST", "localhost")
@@ -250,7 +252,87 @@ def create_world_view(world):
         if conn:
             postgresql_pool.putconn(conn)
 
+# ============================================================================
+# World Management API Endpoints
+# ============================================================================
+
+@app.route('/api/world/start', methods=['POST'])
+def api_start_world():
+    """
+    Start a Luanti world
+    Request JSON: {world, port, map_port (optional), enable_service}
+    """
+    data = request.json
+    if not data or 'world' not in data or 'port' not in data:
+        return jsonify({"error": "Missing required fields"}), 400
+    
+    world_name = data['world']
+    port = data['port']
+    map_port = data.get('map_port')
+    enable_service = data.get('enable_service', True)
+    
+    success, message = world_manager.start_world(
+        world_name, port, map_port, enable_service
+    )
+    
+    if success:
+        return jsonify({"status": "success", "message": message}), 200
+    else:
+        return jsonify({"error": message}), 500
+
+@app.route('/api/world/stop', methods=['POST'])
+def api_stop_world():
+    """
+    Stop a Luanti world
+    Request JSON: {world}
+    """
+    data = request.json
+    if not data or 'world' not in data:
+        return jsonify({"error": "Missing world name"}), 400
+    
+    world_name = data['world']
+    success, message = world_manager.stop_world(world_name)
+    
+    if success:
+        return jsonify({"status": "success", "message": message}), 200
+    else:
+        return jsonify({"error": message}), 500
+
+@app.route('/api/world/status', methods=['GET'])
+def api_world_status():
+    """
+    Get status of a specific world
+    Query param: ?world=worldname
+    """
+    world_name = request.args.get('world')
+    if not world_name:
+        return jsonify({"error": "Missing world parameter"}), 400
+    
+    status = world_manager.get_world_status(world_name)
+    if "error" in status:
+        return jsonify(status), 400
+    
+    return jsonify(status), 200
+
+@app.route('/api/worlds/list', methods=['GET'])
+def api_list_worlds():
+    """
+    List all running worlds
+    """
+    worlds = world_manager.list_running_worlds()
+    return jsonify({"worlds": worlds}), 200
+
+# ============================================================================
+# Static File Serving
+# ============================================================================
+
+@app.route('/')
+def serve_index():
+    """Serve the control panel HTML"""
+    return send_from_directory(app.static_folder, 'index.html')
+
 @app.route('/', methods=['GET'])
+@app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({"status": "running"}), 200
 
