@@ -291,6 +291,7 @@ Content-Type: application/json
 
 {
   "player": "player_name",
+  "world": "world_name",
   "pos": {
     "x": 10.5,
     "y": 20.0,
@@ -300,11 +301,33 @@ Content-Type: application/json
 ```
 Returns: `{"status": "success"}`
 
+**Note**: The `world` parameter is automatically sent by the mod. It detects the world name from the minetest world path.
+
 ### Get Traces
 ```bash
-GET /traces?player=player_name&limit=100
+GET /traces?player=player_name&world=world_name&limit=100
 ```
 Returns list of player position traces.
+
+**Query Parameters:**
+- `player` (optional): Filter by player name
+- `world` (optional): Filter by world name
+- `limit` (optional, default: 100): Number of records to return
+
+### Create World View
+```bash
+POST /create_world_view/<world_name>
+```
+Creates a QGIS-ready view for a specific world.
+
+**Example:**
+```bash
+curl -X POST http://localhost:5000/create_world_view/production
+```
+
+Returns: `{"status": "success", "message": "Created view: view_live_positions_production"}`
+
+**Note**: This is automatically called when the mod loads, so manual creation is typically not needed.
 
 ### Player Logout
 ```bash
@@ -339,11 +362,56 @@ ORDER BY timestamp DESC;
 
 ### QGIS Integration
 
-1. Install QGIS
-2. Add raster layer: `http://<server-ip>:8080/map.png`
-3. Configure as georeferenced using `map.pgw` world file
-4. Add PostGIS layer for player positions
-5. Style as desired
+#### World-Specific Views
+
+Each world automatically gets its own QGIS view when the mod loads:
+- `view_live_positions` - All worlds combined
+- `view_live_positions_production` - Production world only
+- `view_live_positions_testing` - Testing world only
+- `view_live_positions_<worldname>` - Specific world
+
+**Adding to QGIS:**
+
+1. **Install QGIS**
+
+2. **Add Raster Layer (Map Background)**:
+   - Layer → Add Layer → Add Raster Layer
+   - Source: `http://<server-ip>:8080/map.png`
+   - Configure georeferencing with `map.pgw` world file
+
+3. **Add PostGIS Layer (Player Positions)**:
+   - Layer → Add Layer → Add PostGIS Layers
+   - Create new connection to your PostgreSQL database
+   - Select world-specific view (e.g., `view_live_positions_production`)
+   - Set as point layer
+
+4. **Style the Layer**:
+   - Right-click layer → Properties → Symbology
+   - Add labels with player names
+   - Style points as needed
+
+**Example Multi-World Setup:**
+
+```bash
+# QGIS shows different colors for each world:
+# - view_live_positions_production (red points)
+# - view_live_positions_testing (blue points)
+# - view_live_positions_creative (green points)
+```
+
+**Querying Specific Worlds:**
+
+```sql
+# View all active players in production world
+SELECT * FROM view_live_positions_production;
+
+# Query historical data for a specific world
+SELECT player_name, x, y, z, timestamp 
+FROM player_traces_archive 
+WHERE world_name = 'production' 
+ORDER BY timestamp DESC 
+LIMIT 100;
+```
 
 ## Troubleshooting
 

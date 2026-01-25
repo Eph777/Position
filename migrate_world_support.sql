@@ -1,34 +1,21 @@
--- PostgreSQL Schema for Luanti Player Position Tracker
--- This schema stores player position traces with timestamps and world information
+-- Migration script for adding world_name support to existing databases
+-- Run this on existing databases to add world-specific filtering
 
-CREATE TABLE IF NOT EXISTS player_traces (
-    id SERIAL PRIMARY KEY,
-    player_name VARCHAR(100) NOT NULL,
-    world_name VARCHAR(100),
-    x DOUBLE PRECISION NOT NULL,
-    y DOUBLE PRECISION NOT NULL,
-    z DOUBLE PRECISION NOT NULL,
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+-- Step 1: Add world_name columns (allows NULL initially for compatibility)
+ALTER TABLE player_traces ADD COLUMN IF NOT EXISTS world_name VARCHAR(100);
+ALTER TABLE player_traces_archive ADD COLUMN IF NOT EXISTS world_name VARCHAR(100);
 
-CREATE TABLE IF NOT EXISTS player_traces_archive (
-    id SERIAL PRIMARY KEY,
-    player_name VARCHAR(100) NOT NULL,
-    world_name VARCHAR(100),
-    x DOUBLE PRECISION NOT NULL,
-    y DOUBLE PRECISION NOT NULL,
-    z DOUBLE PRECISION NOT NULL,
-    timestamp TIMESTAMP WITH TIME ZONE,
-    archived_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+-- Step 2: Set default world for existing records (optional)
+-- Uncomment the following lines if you want to assign existing data to a specific world
+-- UPDATE player_traces SET world_name = 'default' WHERE world_name IS NULL;
+-- UPDATE player_traces_archive SET world_name = 'default' WHERE world_name IS NULL;
 
--- Indexes for faster querying
-CREATE INDEX IF NOT EXISTS idx_player_traces_archive_name_time ON player_traces_archive(player_name, timestamp);
+-- Step 3: Add indexes for world-based queries
 CREATE INDEX IF NOT EXISTS idx_player_traces_world ON player_traces(world_name);
 CREATE INDEX IF NOT EXISTS idx_player_traces_archive_world ON player_traces_archive(world_name);
 CREATE INDEX IF NOT EXISTS idx_player_traces_world_name ON player_traces(world_name, player_name);
 
--- Create optimized view for QGIS live tracking (latest position per player, all worlds)
+-- Step 4: Update the combined view to include world_name
 CREATE OR REPLACE VIEW view_live_positions AS
 SELECT DISTINCT ON (player_name, world_name) 
     id, player_name, world_name, x, y, z, timestamp,
@@ -37,8 +24,7 @@ FROM player_traces
 WHERE timestamp > NOW() - INTERVAL '60 seconds'
 ORDER BY player_name, world_name, timestamp DESC;
 
--- Function to create world-specific views dynamically
--- Usage: SELECT create_world_view('myworld');
+-- Step 5: Create the dynamic view generation function
 CREATE OR REPLACE FUNCTION create_world_view(world_name_param TEXT) RETURNS TEXT AS $$
 DECLARE
     view_name TEXT;
@@ -62,3 +48,6 @@ BEGIN
     RETURN 'Created view: ' || view_name;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Migration complete!
+-- You can now create world-specific views with: SELECT create_world_view('yourworld');
