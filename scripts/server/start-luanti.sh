@@ -24,29 +24,74 @@
 PROJECT_ROOT=$(cat /root/.proj_root)
 source $PROJECT_ROOT/src/lib/common.sh
 
-WORLD="$1"
-PORT="${2:-30000}"
+# Defaults
+WORLD=""
+PORT=30000
 IS_SERVICE=false
 MAP_PORT=""
+MAP_INTERVAL="15"
 
-# Open firewall for game server port
-sudo ufw allow "$PORT/udp"
+# Parse Positional Arguments
+# Check if current First argument is existent and NOT a flag
+if [[ -n "$1" && "$1" != -* ]]; then
+    WORLD="$1"
+    shift
+fi
 
-# Parse arguments
-shift 2 2>/dev/null || shift $#
+# Check if current First argument (was second) is a number (Port)
+if [[ -n "$1" && "$1" =~ ^[0-9]+$ ]]; then
+    PORT="$1"
+    shift
+fi
+
+# Parse Flags
 while [[ $# -gt 0 ]]; do
-    case $1 in
-        --service) IS_SERVICE=true; shift ;;
-        --map) MAP_PORT="$2"; shift 2 ;;
-        *) shift ;;
+    case "$1" in
+        --help)
+            echo "Usage: $0 <world_name> [port] [--service] [--map MAP_PORT] [--map-refresh INTERVAL]"
+            echo "  <world_name>             Name of the world folder (Required)"
+            echo "  [port]                   UDP Port for game server (Default: 30000)"
+            echo "  --service                Create and start as systemd service"
+            echo "  --map PORT               Also start map hosting on TCP PORT"
+            echo "  --map-refresh SECONDS    Map render interval (Default: 15s)"
+            exit 0
+            ;;
+        --service)
+            IS_SERVICE=true
+            shift
+            ;;
+        --map)
+            if [[ -z "$2" || "$2" == -* ]]; then
+                echo "Error: --map requires a port number argument"
+                exit 1
+            fi
+            MAP_PORT="$2"
+            shift 2
+            ;;
+        --map-refresh)
+            if [[ -z "$2" || "$2" == -* ]]; then
+                echo "Error: --map-refresh requires a seconds argument"
+                exit 1
+            fi
+            MAP_INTERVAL="$2"
+            shift 2
+            ;;
+        *)
+            echo "Error: Unknown argument '$1'"
+            exit 1
+            ;;
     esac
 done
 
+sudo ufw allow "$PORT/udp"
+sudo ufw allow "$MAP_PORT/tcp"
+
 if [ -z "$WORLD" ]; then
-    print_error "Usage: $0 <world_name> [port] [--service] [--map MAP_PORT]"
+    print_error "Usage: $0 <world_name> [port] [--service] [--map MAP_PORT] [--map-refresh INTERVAL]"
     echo "  Without --service: Runs in foreground"
     echo "  With --service: Creates and starts systemd service"
     echo "  With --map PORT: Also starts map rendering and hosting on specified port"
+    echo "  With --map-refresh INTERVAL: Set map refresh interval in seconds"
     exit 1
 fi
 
@@ -94,7 +139,7 @@ if [ -n "$MAP_PORT" ]; then
     
     # Run map hosting setup script
     print_info "Configuring map services..."
-    "$PROJECT_ROOT/scripts/map/setup-hosting.sh" "$WORLD" "$MAP_PORT" || {
+    "$PROJECT_ROOT/scripts/map/setup-hosting.sh" "$WORLD" "$MAP_PORT" "$MAP_INTERVAL" || {
         print_error "Failed to setup map services"
         exit 1
     }

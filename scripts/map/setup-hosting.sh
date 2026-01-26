@@ -23,10 +23,12 @@ source $PROJECT_ROOT/src/lib/common.sh
 
 WORLD="$1"
 MAP_PORT="${2:-8080}"  # Default to 8080 if not specified
+RENDER_INTERVAL="${3:-15}"  # Default to 15 seconds if not specified
 
 if [ -z "$WORLD" ]; then
-    print_error "Usage: $0 <world_name> [map_port]"
+    print_error "Usage: $0 <world_name> [map_port] [render_interval]"
     echo "  Default port: 8080"
+    echo "  Default render interval: 15s"
     exit 1
 fi
 
@@ -57,13 +59,13 @@ print_info "Setting up real-time map services..."
 print_info "Creating luanti-map-render@${WORLD}.service..."
 sudo tee /etc/systemd/system/luanti-map-render@${WORLD}.service > /dev/null <<EOF
 [Unit]
-Description=Luanti Map Auto-Renderer - ${WORLD} (15s Interval)
+Description=Luanti Map Auto-Renderer - ${WORLD} (${RENDER_INTERVAL}s Interval)
 
 [Service]
 Type=simple
 User=${SERVICE_USER}
 WorkingDirectory=$PROJECT_ROOT
-ExecStart=/bin/bash $PROJECT_ROOT/scripts/map/auto-render.sh $WORLD
+ExecStart=/bin/bash $PROJECT_ROOT/scripts/map/auto-render.sh $WORLD $RENDER_INTERVAL
 Restart=always
 
 [Install]

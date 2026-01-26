@@ -39,14 +39,6 @@ wheels/
 .DS_Store
 Thumbs.db
 
-# Old scripts (deprecated)
-setup_*.sh
-render_map.sh
-auto_render_loop.sh
-migrate.sh
-sls.sh
-reset_environment.sh
-
 # Map output
 map_output/
 *.pgw

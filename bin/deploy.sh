@@ -163,11 +163,11 @@ echo ""
 
 if [ "$AUTO" = false ]; then
     print_warning "This will install and configure:"
-    echo "  • PostgreSQL database"
-    echo "  • Python Flask server"
-    echo "  • Luanti game server"
-    echo "  • Map rendering system"
-    echo "  • All required systemd services"
+    echo "  * PostgreSQL database"
+    echo "  * Python Flask server"
+    echo "  * Luanti game server"
+    echo "  * Map rendering system"
+    echo "  * All required systemd services"
     echo ""
     confirm "Do you want to continue?" || exit 0
 fi
@@ -203,7 +203,8 @@ sudo systemctl status luanti-tracker-postgresql --no-pager | head -n 3
 echo ""
 print_info "Next Steps:"
 echo "  1. Start Luanti server:"
-echo "     ~/sls $WORLD_NAME 30000"
+echo "     ~/start-luanti.sh $WORLD_NAME 30000"
+echo "  or ~/start-luanti.sh --help"
 echo ""
 echo "  2. Connect from Luanti client:"
 echo "     Server: $(hostname -I | awk '{print $1}')"

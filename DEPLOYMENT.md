@@ -207,7 +207,7 @@ sudo journalctl -u luanti-tracker-postgresql -f
 
 ```bash
 # Start server manually
-~/sls myworld 30000
+~/start-luanti.sh myworld 30000
 
 # Or create systemd service (recommended for production)
 sudo cp scripts/server/start-luanti.sh /usr/local/bin/luanti-start

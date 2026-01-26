@@ -7,12 +7,12 @@ A comprehensive system for tracking and storing player positions from a Luanti (
 
 ## 1.1. Features
 
-- 🎮 **Real-time Position Tracking**: Captures player positions every second via Luanti mod
-- 🗺️ **Auto Map Rendering**: Generates map images every 15 seconds
-- 🌐 **HTTP Map Server**: Serves rendered maps via HTTP for QGIS integration
-- 📊 **PostgreSQL Database**: Robust data storage with spatial extensions
-- 🚀 **One-Command Deployment**: Unified deployment script for production
-- 🔄 **Auto-Archiving**: Intelligent data management with live/archive tables
+- **Real-time Position Tracking**: Captures player positions every second via Luanti mod
+- **Auto Map Rendering**: Generates map images every 15 seconds
+- **HTTP Map Server**: Serves rendered maps via HTTP for QGIS integration
+- **PostgreSQL Database**: Robust data storage with spatial extensions
+- **One-Command Deployment**: Unified deployment script for production
+- **Auto-Archiving**: Intelligent data management with live/archive tables
 
 ## 1.2. Quick Start
 
@@ -37,18 +37,18 @@ cd luanti-position-tracker
 ```
 
 That's it! The deployment script will:
-1. ✅ Install PostgreSQL and all dependencies
-2. ✅ Set up Python Flask server
-3. ✅ Install Luanti game server
-4. ✅ Compile map renderer
-5. ✅ Configure systemd services
-6. ✅ Set up firewall rules
+1. Install PostgreSQL and all dependencies
+2. Set up Python Flask server
+3. Install Luanti game server
+4. Compile map renderer
+5. Configure systemd services
+6. Set up firewall rules
 
 ### 1.2.3. Start Playing
 
 ```bash
 # Start Luanti server
-~/sls myworld 30000
+~/start-luanti.sh myworld 30000
 
 # Connect from your Luanti client
 # Server: <your-server-ip>
