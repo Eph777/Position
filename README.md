@@ -87,7 +87,7 @@ luanti-position-tracker/
 ├── requirements.txt           # Python dependencies
 
 ## 1.4. System architecture
-![system architecture](public/assets/system_architecture.png)
+![system architecture](https://github.com/Eph777/luanti-qgis/public/assets/system_architecture.png)
 
 ## 1.5. Deployment Options
 
