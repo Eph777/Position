@@ -89,32 +89,8 @@ luanti-position-tracker/
 └── DEPLOYMENT.md              # Detailed deployment guide
 ```
 
-## System Architecture
-
-```
-┌─────────────────┐
-│  Luanti Server  │
-│   (with mod)    │
-└────────┬────────┘
-         │ HTTP POST
-         │ /position
-         ▼
-┌─────────────────┐      ┌──────────────────┐
-│  Flask Server   │─────▶│   PostgreSQL     │
-│  (port 5000)    │      │   Database       │
-└─────────────────┘      └──────────────────┘
-                                   │
-                                   │ Read
-                                   ▼
-┌─────────────────┐      ┌──────────────────┐
-│  Map Renderer   │─────▶│  Map HTTP Server │
-│  (auto-render)  │      │   (port 8080)    │
-└─────────────────┘      └──────────────────┘
-         │                        │
-         │                        │
-         ▼                        ▼
-    map.png                   QGIS/Browser
-```
+## System architecture
+![system architecture](image.png)
 
 ## Deployment Options
 
