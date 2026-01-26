@@ -85,13 +85,17 @@ luanti-position-tracker/
 │   └── mod.conf               # Mod configuration
 ├── schema.sql                 # PostgreSQL schema
 ├── requirements.txt           # Python dependencies
+├── README.md                  # This file
+└── DEPLOYMENT.md              # Detailed deployment guide
+```
 
 ## 1.4. System architecture
-![system architecture](https://github.com/Eph777/luanti-qgis/public/assets/system_architecture.png)
+![system architecture](public/assets/system_architecture.png)
 
 ## 1.5. Deployment Options
 
 ### 1.5.1. Interactive Setup
+```bash
 ./bin/deploy.sh
 ```
 Prompts for confirmation at each step. Best for first-time setup.
