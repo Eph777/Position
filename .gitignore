@@ -49,7 +49,6 @@ reset_environment.sh
 
 # Map output
 map_output/
-*.png
 *.pgw
 
 # Database backups
