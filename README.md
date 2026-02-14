@@ -26,8 +26,11 @@ A comprehensive system for tracking and storing player positions from a Luanti (
 
 ```bash
 # Clone the repository
+sudo bash
+cd /root 
+
 git clone <repository-url>
-cd luanti-position-tracker
+cd luanti-qgis
 
 # Run unified deployment (interactive)
 ./bin/deploy.sh
