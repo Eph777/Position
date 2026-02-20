@@ -49,7 +49,7 @@ echo "============================================================"
 # Read user selection manually to provide clean formatting instead of default select menu
 while true; do
     read -p "Select a backup to restore (enter a number): " choice
-    if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#archives[@]}" ];; then
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#archives[@]}" ]; then
         index=$((choice-1))
         ARCHIVE="${archives[$index]}"
         echo "You selected: $(basename "$ARCHIVE")"
