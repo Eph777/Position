@@ -83,6 +83,27 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# # interactive personalization
+# echo "Let's configure your game server!"
+# echo "what is the name of your (new) world?"
+# read -p "==> " -r
+# WORLD="$REPLY"
+# echo "on which port would you like to run the game server ?"
+# read -p "==> " -r
+# PORT="$REPLY"
+# echo "on which port would you like to run the map hosting server ?"
+# read -p "==> " -r
+# MAP_PORT="$REPLY"
+# echo "What refresh interval do you want to use for the map rendering ?"
+# read -p "==> " -r
+# MAP_INTERVAL="$REPLY"
+# echo "Do you want to run the server as a systemd service ?"
+# read -p "(y/n) ==> " -n 1 -r
+# if [[ "$REPLY" == "y" ]]; then
+#     IS_SERVICE=true
+# fi
+# echo
+
 sudo ufw allow "$PORT/udp"
 sudo ufw allow "$MAP_PORT/tcp"
 
