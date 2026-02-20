@@ -130,7 +130,7 @@ if [ "$UPDATE" = true ]; then
     if [ -d "$PROJECT_ROOT/.git" ]; then
         print_info "Pulling latest code..."
         cd "$PROJECT_ROOT"
-        git pull
+        git pull origin main
     fi
     
     # Update Python dependencies
