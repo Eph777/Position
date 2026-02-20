@@ -54,4 +54,6 @@ echo "============================================"
 echo "BACKUP COMPLETE: $BACKUP_DIR/$ARCHIVE_NAME"
 echo "============================================"
 echo "Run this command on your LOCAL machine to download it:"
-echo "scp root@your-vps-ip:$(pwd)/$BACKUP_DIR/$ARCHIVE_NAME ./"
+
+VPS_IP=$(hostname -I | awk '{print $1}')
+echo "scp root@$VPS_IP:$(pwd)/$BACKUP_DIR/$ARCHIVE_NAME ./"
