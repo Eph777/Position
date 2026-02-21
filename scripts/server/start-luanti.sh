@@ -146,8 +146,9 @@ if [ ! -d "$WORLD_PATH" ]; then
 fi
 
 # Create worldmods directory if it doesn't exist
-if [ ! -d "~/snap/luanti/common/.minetest/mods" ]; then
-    mkdir -p "~/snap/luanti/common/.minetest/mods"
+MODS_DIR="$USER_HOME/snap/luanti/common/.minetest/mods"
+if [ ! -d "$MODS_DIR" ]; then
+    mkdir -p "$MODS_DIR"
 fi
 
 # Create or verify world.mt file
@@ -199,7 +200,7 @@ if [[ "$INTERACTIVE" == true ]]; then
                     # Remove trailing -master or version tags commonly found in downloaded zips
                     CLEAN_MOD_NAME=$(echo "$MOD_NAME" | sed -E 's/-[0-9a-fA-F]+$|-master$//')
                     
-                    TARGET_MOD_DIR="~/snap/luanti/common/.minetest/mods/$CLEAN_MOD_NAME"
+                    TARGET_MOD_DIR="$MODS_DIR/$CLEAN_MOD_NAME"
                     
                     if [ -d "$TARGET_MOD_DIR" ]; then
                         print_warning "Mod '$CLEAN_MOD_NAME' already exists. Overwriting..."
