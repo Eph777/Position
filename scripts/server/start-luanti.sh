@@ -30,6 +30,7 @@ PORT=30000
 IS_SERVICE=false
 MAP_PORT=""
 MAP_INTERVAL="15"
+INTERACTIVE=false
 
 # Parse Positional Arguments
 # Check if current First argument is existent and NOT a flag
@@ -48,13 +49,18 @@ fi
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --help)
-            echo "Usage: $0 <world_name> [port] [--service] [--map MAP_PORT] [--map-refresh INTERVAL]"
-            echo "  <world_name>             Name of the world folder (Required)"
+            echo "Usage: $0 [-i|--interactive] <world_name> [port] [--service] [--map MAP_PORT] [--map-refresh INTERVAL]"
+            echo "  -i, --interactive        Run in interactive mode"
+            echo "  <world_name>             Name of the world folder (Required unless interactive)"
             echo "  [port]                   UDP Port for game server (Default: 30000)"
             echo "  --service                Create and start as systemd service"
             echo "  --map PORT               Also start map hosting on TCP PORT"
             echo "  --map-refresh SECONDS    Map render interval (Default: 15s)"
             exit 0
+            ;;
+        -i|--interactive)
+            INTERACTIVE=true
+            shift
             ;;
         --service)
             IS_SERVICE=true
@@ -83,32 +89,44 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# # interactive personalization
-# echo "Let's configure your game server!"
-# echo "what is the name of your (new) world?"
-# read -p "==> " -r
-# WORLD="$REPLY"
-# echo "on which port would you like to run the game server ?"
-# read -p "==> " -r
-# PORT="$REPLY"
-# echo "on which port would you like to run the map hosting server ?"
-# read -p "==> " -r
-# MAP_PORT="$REPLY"
-# echo "What refresh interval do you want to use for the map rendering ?"
-# read -p "==> " -r
-# MAP_INTERVAL="$REPLY"
-# echo "Do you want to run the server as a systemd service ?"
-# read -p "(y/n) ==> " -n 1 -r
-# if [[ "$REPLY" == "y" ]]; then
-#     IS_SERVICE=true
-# fi
-# echo
+if [[ "$INTERACTIVE" == true ]]; then
+    # interactive personalization
+    echo "Let's configure your game server!"
+
+    echo "What is the name of your (new) world? ${WORLD:+(Current: $WORLD)}"
+    read -p "==> " -r
+    if [[ -n "$REPLY" ]]; then WORLD="$REPLY"; fi
+
+    echo "On which port would you like to run the game server? (Current: $PORT)"
+    read -p "==> " -r
+    if [[ -n "$REPLY" ]]; then PORT="$REPLY"; fi
+
+    echo "On which port would you like to run the map hosting server? ${MAP_PORT:+(Current: $MAP_PORT, leave empty to disable)}"
+    read -p "==> " -r
+    if [[ -n "$REPLY" ]]; then MAP_PORT="$REPLY"; fi
+
+    if [[ -n "$MAP_PORT" ]]; then
+        echo "What refresh interval do you want to use for the map rendering? (Current: $MAP_INTERVAL)"
+        read -p "==> " -r
+        if [[ -n "$REPLY" ]]; then MAP_INTERVAL="$REPLY"; fi
+    fi
+
+    echo "Do you want to run the server as a systemd service? (y/n) (Current: $(if [ "$IS_SERVICE" = true ]; then echo 'y'; else echo 'n'; fi))"
+    read -p "==> " -n 1 -r
+    echo
+    if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+        IS_SERVICE=true
+    elif [[ "$REPLY" =~ ^[Nn]$ ]]; then
+        IS_SERVICE=false
+    fi
+    echo
+fi
 
 sudo ufw allow "$PORT/udp"
-sudo ufw allow "$MAP_PORT/tcp"
 
 if [ -z "$WORLD" ]; then
-    print_error "Usage: $0 <world_name> [port] [--service] [--map MAP_PORT] [--map-refresh INTERVAL]"
+    print_error "Usage: $0 [-i|--interactive] <world_name> [port] [--service] [--map MAP_PORT] [--map-refresh INTERVAL]"
+    echo "  With -i, --interactive:  Prompts for configuration interactively"
     echo "  Without --service: Runs in foreground"
     echo "  With --service: Creates and starts systemd service"
     echo "  With --map PORT: Also starts map rendering and hosting on specified port"
@@ -127,6 +145,11 @@ if [ ! -d "$WORLD_PATH" ]; then
     mkdir -p "$WORLD_PATH"
 fi
 
+# Create worldmods directory if it doesn't exist
+if [ ! -d "$WORLD_PATH/worldmods" ]; then
+    mkdir -p "$WORLD_PATH/worldmods"
+fi
+
 # Create or verify world.mt file
 if [ ! -f "$WORLD_MT" ]; then
     print_info "Creating world.mt configuration file..."
@@ -141,6 +164,69 @@ EOF
     print_info "World configuration created."
 else
     print_info "World $WORLD exists."
+fi
+
+# Interactive Mod Installation
+if [[ "$INTERACTIVE" == true ]]; then
+    echo
+    echo "--- Mod Installation ---"
+    while true; do
+        read -p "Would you like to install a mod? (y/n) ==> " -n 1 -r
+        echo
+        if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+            break
+        fi
+        
+        echo "Please provide the direct .zip download link of the mod:"
+        read -p "URL ==> " -r MOD_URL
+        
+        if [[ -z "$MOD_URL" ]]; then
+            print_error "No URL provided."
+            continue
+        fi
+
+        TEMP_ZIP=$(mktemp)
+        print_info "Downloading mod..."
+        if curl -sL "$MOD_URL" -o "$TEMP_ZIP"; then
+            MOD_EXTRACT_DIR=$(mktemp -d)
+            if unzip -q "$TEMP_ZIP" -d "$MOD_EXTRACT_DIR"; then
+                # Find the actual mod directory inside (often nested)
+                MOD_ROOT_DIR=$(find "$MOD_EXTRACT_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+                
+                if [[ -n "$MOD_ROOT_DIR" ]]; then
+                    MOD_NAME=$(basename "$MOD_ROOT_DIR")
+                    
+                    # Remove trailing -master or version tags commonly found in downloaded zips
+                    CLEAN_MOD_NAME=$(echo "$MOD_NAME" | sed -E 's/-[0-9a-fA-F]+$|-master$//')
+                    
+                    TARGET_MOD_DIR="$WORLD_PATH/worldmods/$CLEAN_MOD_NAME"
+                    
+                    if [ -d "$TARGET_MOD_DIR" ]; then
+                        print_warning "Mod '$CLEAN_MOD_NAME' already exists. Overwriting..."
+                        rm -rf "$TARGET_MOD_DIR"
+                    fi
+                    
+                    mv "$MOD_ROOT_DIR" "$TARGET_MOD_DIR"
+                    print_info "Installed mod to $TARGET_MOD_DIR"
+                    
+                    # Ensure mod is enabled in world.mt
+                    if ! grep -q "^load_mod_${CLEAN_MOD_NAME} = true" "$WORLD_MT"; then
+                        echo "load_mod_${CLEAN_MOD_NAME} = true" >> "$WORLD_MT"
+                        print_info "Enabled mod '$CLEAN_MOD_NAME' in world.mt"
+                    fi
+                else
+                    print_error "Could not find a valid mod directory in the downloaded zip."
+                fi
+            else
+                print_error "Failed to extract the mod zip."
+            fi
+            rm -rf "$MOD_EXTRACT_DIR"
+        else
+            print_error "Failed to download the mod."
+        fi
+        rm -f "$TEMP_ZIP"
+        echo
+    done
 fi
 
 # Check port availability
