@@ -49,6 +49,7 @@ minetest.register_on_joinplayer(function(player)
     if name then leaving_players[name] = nil end
 end)
 
+local view_created = false
 local BATCH_URL = SERVER_BASE_URL .. "/positions/batch"
 
 minetest.register_globalstep(function(dtime)
@@ -57,6 +58,22 @@ minetest.register_globalstep(function(dtime)
     timer = timer + dtime
     if timer < UPDATE_INTERVAL then return end
     timer = 0
+
+    -- Try to create the QGIS View if it hasn't succeeded yet
+    if not view_created then
+        http_api.fetch({
+            url = CREATE_VIEW_URL .. "/" .. WORLD_NAME,
+            method = "POST",
+            timeout = 5
+        }, function(res)
+            if res.code == 201 or res.code == 200 then
+                view_created = true
+                minetest.log("action", "[position_tracker] Created QGIS view for world: " .. WORLD_NAME)
+            elseif res.code ~= 201 and res.code ~= 200 then
+                -- Silently retry to avoid spamming the log during python server boot
+            end
+        end)
+    end
 
     local players = minetest.get_connected_players()
     local batch_data = {}
@@ -144,18 +161,3 @@ minetest.register_on_leaveplayer(function(player)
 end)
 
 minetest.log("action", "[position_tracker] Mod loaded and ready to track positions.")
-
--- Create world-specific QGIS view on mod load
-if http_api then
-    http_api.fetch({
-        url = CREATE_VIEW_URL .. "/" .. WORLD_NAME,
-        method = "POST",
-        timeout = 5
-    }, function(res)
-        if res.code == 201 or res.code == 200 then
-            minetest.log("action", "[position_tracker] Created QGIS view for world: " .. WORLD_NAME)
-        else
-            minetest.log("warning", "[position_tracker] Failed to create QGIS view: " .. (res.code or "unknown"))
-        end
-    end)
-end
