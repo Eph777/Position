@@ -28,11 +28,11 @@ local leaving_players = {} -- Track players who are logging out to prevent race 
 
 -- Detect world name from world path
 local world_path = minetest.get_worldpath()
-local WORLD_NAME = "default"
+local WORLD_NAME = "null"
 
 -- Extract world name from path (e.g., /path/to/worlds/myworld -> myworld)
 if world_path then
-    WORLD_NAME = string.match(world_path, "([^/]+)$") or "default"
+    WORLD_NAME = string.match(world_path, "([^/]+)$") or "null"
     minetest.log("action", "[position_tracker] Detected world: " .. WORLD_NAME)
 end
 
@@ -54,6 +54,7 @@ local BATCH_URL = SERVER_BASE_URL .. "/positions/batch"
 
 minetest.register_globalstep(function(dtime)
     if not http_api then return end
+    if WORLD_NAME == "null" then return end
 
     timer = timer + dtime
     if timer < UPDATE_INTERVAL then return end
