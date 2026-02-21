@@ -44,24 +44,38 @@ try:
 except (Exception, psycopg2.DatabaseError) as error:
     print(f"Error while connecting to PostgreSQL: {error}")
 
-@app.route('/position', methods=['POST'])
-def log_position():
+@app.route('/positions/batch', methods=['POST'])
+def log_positions_batch():
     """
-    Receives position data from Luanti mod.
-    Expected JSON: {"player": "name", "world": "worldname", "pos": {"x": 1.0, "y": 2.0, "z": 3.0}}
+    Receives an array of position data from Luanti mod.
+    Expected JSON: [{"player": "name", "world": "worldname", "pos": {"x": 1.0, "y": 2.0, "z": 3.0}}, ...]
     """
-    data = request.json
-    if not data or 'player' not in data or 'pos' not in data:
-        return jsonify({"error": "Invalid data format"}), 400
+    data_list = request.json
+    if not isinstance(data_list, list):
+        return jsonify({"error": "Expected a list of position objects"}), 400
+        
+    if len(data_list) == 0:
+        return jsonify({"status": "success", "message": "No positions to process"}), 200
 
-    player = data['player']
-    world = data.get('world', 'default')  # Default world if not specified
-    pos = data['pos']
-    x = pos.get('x', 0)
-    y = pos.get('y', 0)
-    z = pos.get('z', 0)
-    
-    # Insert into database
+    # Prepare values for bulk insert
+    insert_values = []
+    for data in data_list:
+        if not data or 'player' not in data or 'pos' not in data:
+            continue
+            
+        player = data['player']
+        world = data.get('world', 'default')
+        pos = data['pos']
+        x = pos.get('x', 0)
+        y = pos.get('y', 0)
+        z = pos.get('z', 0)
+        
+        insert_values.append((player, world, x, y, z))
+        
+    if not insert_values:
+        return jsonify({"error": "No valid data found"}), 400
+        
+    # Insert sequence
     conn = None
     try:
         conn = postgresql_pool.getconn()
@@ -70,16 +84,16 @@ def log_position():
             INSERT INTO player_traces (player_name, world_name, x, y, z)
             VALUES (%s, %s, %s, %s, %s)
         """
-        cursor.execute(query, (player, world, x, y, z))
+        # Execute the bulk insert efficiently
+        cursor.executemany(query, insert_values)
         conn.commit()
         
-        # 3. Success response immediately (don't let cleanup block this)
-        response = jsonify({"status": "success"})
+        # Success response immediately
+        response = jsonify({"status": "success", "inserted": len(insert_values)})
         status_code = 201
         
-        # 4. Cleanup (Best Effort)
+        # Cleanup (Best Effort)
         try:
-            # We use a new cursor check for cleanup to isolate it
             cursor.close()
             cursor = conn.cursor()
             
@@ -107,7 +121,7 @@ def log_position():
     except (Exception, psycopg2.DatabaseError) as error:
         if conn:
             conn.rollback()
-        print(f"Error saving trace: {error}")
+        print(f"Error saving trace batch: {error}")
         return jsonify({"error": str(error)}), 500
     finally:
         if conn:

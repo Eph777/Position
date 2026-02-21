@@ -49,6 +49,8 @@ minetest.register_on_joinplayer(function(player)
     if name then leaving_players[name] = nil end
 end)
 
+local BATCH_URL = SERVER_BASE_URL .. "/positions/batch"
+
 minetest.register_globalstep(function(dtime)
     if not http_api then return end
 
@@ -57,6 +59,8 @@ minetest.register_globalstep(function(dtime)
     timer = 0
 
     local players = minetest.get_connected_players()
+    local batch_data = {}
+
     for _, player in ipairs(players) do
         local name = player:get_player_name()
         local pos = player:get_pos()
@@ -75,8 +79,8 @@ minetest.register_globalstep(function(dtime)
             }, function(res) end) -- fire and forget
         
         elseif name and pos then
-            -- Normal case: Player is active, send position update
-            local data = {
+            -- Normal case: Player is active, add to batch
+            table.insert(batch_data, {
                 player = name,
                 world = WORLD_NAME,
                 pos = {
@@ -84,24 +88,25 @@ minetest.register_globalstep(function(dtime)
                     y = pos.y,
                     z = pos.z-7
                 }
-            }
-
-            -- Send asynchronous POST request
-            -- Note: We don't log success to avoid spamming debug log every second
-            http_api.fetch({
-                url = POSITION_URL,
-                method = "POST",
-                data = minetest.write_json(data),
-                timeout = 5,
-                extra_headers = {
-                    "Content-Type: application/json"
-                }
-            }, function(res)
-                if res.code ~= 201 and res.code ~= 200 then
-                    minetest.log("warning", "[position_tracker] Failed to send position for " .. name .. ": " .. (res.code or "unknown"))
-                end
-            end)
+            })
         end
+    end
+
+    -- Send batch if there are players
+    if #batch_data > 0 then
+        http_api.fetch({
+            url = BATCH_URL,
+            method = "POST",
+            data = minetest.write_json(batch_data),
+            timeout = 5,
+            extra_headers = {
+                "Content-Type: application/json"
+            }
+        }, function(res)
+            if res.code ~= 201 and res.code ~= 200 then
+                minetest.log("warning", "[position_tracker] Failed to send batch position update: " .. (res.code or "unknown"))
+            end
+        end)
     end
 end)
 
