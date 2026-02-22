@@ -93,7 +93,7 @@ if [[ "$INTERACTIVE" == true ]]; then
     # interactive personalization
     echo "--- Server Configuration ---"
 
-    WORLDS_DIR="$USER_HOME/snap/luanti/common/.minetest/worlds"
+    WORLDS_DIR="/root/snap/luanti/common/.minetest/worlds"
     existing_worlds=()
     if [ -d "$WORLDS_DIR" ]; then
         for w in "$WORLDS_DIR"/*; do
