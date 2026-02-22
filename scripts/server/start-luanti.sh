@@ -151,6 +151,12 @@ if [ ! -d "$MODS_DIR" ]; then
     mkdir -p "$MODS_DIR"
 fi
 
+# Create mod_archives directory if it doesn't exist
+MOD_ARCHIVES_DIR="$USER_HOME/snap/luanti/common/.minetest/mod_archives"
+if [ ! -d "$MOD_ARCHIVES_DIR" ]; then
+    mkdir -p "$MOD_ARCHIVES_DIR"
+fi
+
 # Create or verify world.mt file
 if [ ! -f "$WORLD_MT" ]; then
     print_info "Creating world.mt configuration file..."
@@ -178,17 +184,51 @@ if [[ "$INTERACTIVE" == true ]]; then
             break
         fi
         
-        echo "Please provide the direct .zip download link of the mod:"
-        read -p "URL ==> " -r MOD_URL
+        echo "Available local mod zips in 'mod_archives':"
+        local_zips=("$MOD_ARCHIVES_DIR"/*.zip)
+        if [ -e "${local_zips[0]}" ]; then
+            for zip in "${local_zips[@]}"; do
+                echo "  - $(basename "$zip")"
+            done
+        else
+            echo "  (None found)"
+        fi
+        echo
+        echo "Please provide either the direct .zip download link OR the name of a local zip file:"
+        read -p "URL or Filename ==> " -r MOD_INPUT
         
-        if [[ -z "$MOD_URL" ]]; then
-            print_error "No URL provided."
+        if [[ -z "$MOD_INPUT" ]]; then
+            print_error "No input provided."
             continue
         fi
 
         TEMP_ZIP=$(mktemp)
-        print_info "Downloading mod..."
-        if curl -sL "$MOD_URL" -o "$TEMP_ZIP"; then
+        DOWNLOAD_SUCCESS=false
+
+        if [[ "$MOD_INPUT" == http://* ]] || [[ "$MOD_INPUT" == https://* ]]; then
+            print_info "Downloading mod from URL..."
+            if curl -sL "$MOD_INPUT" -o "$TEMP_ZIP"; then
+                DOWNLOAD_SUCCESS=true
+            else
+                print_error "Failed to download the mod."
+            fi
+        else
+            # Assume it's a local file name
+            LOCAL_FILE="$MOD_ARCHIVES_DIR/$MOD_INPUT"
+            if [[ ! "$LOCAL_FILE" == *.zip ]]; then
+                LOCAL_FILE="${LOCAL_FILE}.zip"
+            fi
+            
+            if [ -f "$LOCAL_FILE" ]; then
+                print_info "Using local mod archive: $(basename "$LOCAL_FILE")"
+                cp "$LOCAL_FILE" "$TEMP_ZIP"
+                DOWNLOAD_SUCCESS=true
+            else
+                print_error "Local file not found: $LOCAL_FILE"
+            fi
+        fi
+
+        if [[ "$DOWNLOAD_SUCCESS" == true ]]; then
             MOD_EXTRACT_DIR=$(mktemp -d)
             if unzip -q "$TEMP_ZIP" -d "$MOD_EXTRACT_DIR"; then
                 # Find the actual mod directory inside (often nested)
@@ -222,8 +262,6 @@ if [[ "$INTERACTIVE" == true ]]; then
                 print_error "Failed to extract the mod zip."
             fi
             rm -rf "$MOD_EXTRACT_DIR"
-        else
-            print_error "Failed to download the mod."
         fi
         rm -f "$TEMP_ZIP"
         echo
