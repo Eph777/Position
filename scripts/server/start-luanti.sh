@@ -91,28 +91,62 @@ done
 
 if [[ "$INTERACTIVE" == true ]]; then
     # interactive personalization
-    echo "Let's configure your game server!"
+    echo "--- Server Configuration ---"
 
-    echo "What is the name of your (new) world? ${WORLD:+(Current: $WORLD)}"
-    read -p "==> " -r
-    if [[ -n "$REPLY" ]]; then WORLD="$REPLY"; fi
+    WORLDS_DIR="$USER_HOME/snap/luanti/common/.minetest/worlds"
+    existing_worlds=()
+    if [ -d "$WORLDS_DIR" ]; then
+        for w in "$WORLDS_DIR"/*; do
+            if [ -d "$w" ]; then
+                existing_worlds+=("$(basename "$w")")
+            fi
+        done
+    fi
 
-    echo "On which port would you like to run the game server? (Current: $PORT)"
-    read -p "==> " -r
+    echo "[0] create a new world"
+    for i in "${!existing_worlds[@]}"; do
+        echo "[$((i + 1))] ${existing_worlds[$i]}"
+    done
+    
+    while true; do
+        read -p "world choice : " -r W_CHOICE
+        if [[ "$W_CHOICE" =~ ^[0-9]+$ ]]; then
+            if [[ "$W_CHOICE" -eq 0 ]]; then
+                read -p "new world name : " -r NEW_WORLD
+                if [[ -n "$NEW_WORLD" ]]; then
+                    WORLD="$NEW_WORLD"
+                    break
+                else
+                    print_error "Name cannot be empty."
+                fi
+            else
+                W_INDEX=$((W_CHOICE - 1))
+                if [[ "$W_INDEX" -lt 0 ]] || [[ "$W_INDEX" -ge "${#existing_worlds[@]}" ]]; then
+                    print_error "Invalid selection."
+                else
+                    WORLD="${existing_worlds[$W_INDEX]}"
+                    break
+                fi
+            fi
+        else
+            print_error "Invalid choice: please enter a number."
+        fi
+    done
+
+    read -p "game server port (default: $PORT) : " -r
     if [[ -n "$REPLY" ]]; then PORT="$REPLY"; fi
 
-    echo "On which port would you like to run the map hosting server? ${MAP_PORT:+(Current: $MAP_PORT, leave empty to disable)}"
-    read -p "==> " -r
+    read -p "map hosting port (default: ${MAP_PORT:-none}) : " -r
     if [[ -n "$REPLY" ]]; then MAP_PORT="$REPLY"; fi
 
     if [[ -n "$MAP_PORT" ]]; then
-        echo "What refresh interval do you want to use for the map rendering? (Current: $MAP_INTERVAL)"
-        read -p "==> " -r
+        read -p "map refresh interval seconds (default: $MAP_INTERVAL) : " -r
         if [[ -n "$REPLY" ]]; then MAP_INTERVAL="$REPLY"; fi
     fi
 
-    echo "Do you want to run the server as a systemd service? (y/n) (Current: $(if [ "$IS_SERVICE" = true ]; then echo 'y'; else echo 'n'; fi))"
-    read -p "==> " -n 1 -r
+    curr_svc="n"
+    if [ "$IS_SERVICE" = true ]; then curr_svc="y"; fi
+    read -p "run as systemd service? (y/n) (default: $curr_svc) : " -n 1 -r
     echo
     if [[ "$REPLY" =~ ^[Yy]$ ]]; then
         IS_SERVICE=true
