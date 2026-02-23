@@ -292,6 +292,15 @@ if [[ "$INTERACTIVE" == true ]]; then
             
             echo "load_mod_${SELECTED_MOD} = true" >> "$WORLD_MT"
             print_info "Activated installed mod '$SELECTED_MOD' in world.mt"
+            
+            if [ -f "$MODS_DIR/$SELECTED_MOD/mod.conf" ]; then
+                DEPENDS=$(grep -i -E '^[ \t]*depends[ \t]*=' "$MODS_DIR/$SELECTED_MOD/mod.conf" | cut -d'=' -f2- | xargs)
+                if [ -n "$DEPENDS" ]; then
+                    print_warning "This mod depends on other mods: $DEPENDS"
+                    print_warning "Please ensure they are installed before starting the server."
+                fi
+            fi
+            
             rm -f "$TEMP_ZIP"
             echo
             continue
@@ -341,6 +350,14 @@ if [[ "$INTERACTIVE" == true ]]; then
                     else
                         echo "load_mod_${CLEAN_MOD_NAME} = true" >> "$WORLD_MT"
                         print_info "Enabled mod '$CLEAN_MOD_NAME' in world.mt"
+                    fi
+                    
+                    if [ -f "$TARGET_MOD_DIR/mod.conf" ]; then
+                        DEPENDS=$(grep -i -E '^[ \t]*depends[ \t]*=' "$TARGET_MOD_DIR/mod.conf" | cut -d'=' -f2- | xargs)
+                        if [ -n "$DEPENDS" ]; then
+                            print_warning "This recently installed mod depends on other mods: $DEPENDS"
+                            print_warning "Please ensure they are installed before starting the server."
+                        fi
                     fi
                 else
                     print_error "Could not find a valid mod directory in the downloaded zip."
