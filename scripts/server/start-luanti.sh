@@ -223,15 +223,30 @@ if [[ "$INTERACTIVE" == true ]]; then
             [ -e "$f" ] && local_zips+=("$f")
         done
         
+        installed_mods=()
+        for d in "$MODS_DIR"/*; do
+            [ -d "$d" ] && installed_mods+=("$(basename "$d")")
+        done
+        
         echo "[0] add mod by URL"
+        zip_count=${#local_zips[@]}
         for i in "${!local_zips[@]}"; do
-            echo "[$((i + 1))] $(basename "${local_zips[$i]}")"
+            echo "[$((i + 1))] [ZIP] $(basename "${local_zips[$i]}")"
+        done
+        for i in "${!installed_mods[@]}"; do
+            echo "[$((i + 1 + zip_count))] [INSTALLED] ${installed_mods[$i]}"
         done
         
         read -p "your choice : " -r CHOICE
         
         if [[ ! "$CHOICE" =~ ^[0-9]+$ ]]; then
             print_error "Invalid choice: please enter a number."
+            continue
+        fi
+
+        total_choices=$((zip_count + ${#installed_mods[@]}))
+        if [[ "$CHOICE" -gt "$total_choices" ]]; then
+            print_error "Invalid selection."
             continue
         fi
 
@@ -254,18 +269,32 @@ if [[ "$INTERACTIVE" == true ]]; then
             else
                 print_error "Failed to download the mod."
             fi
-        else
+        elif [[ "$CHOICE" -le "$zip_count" ]]; then
             FILE_INDEX=$((CHOICE - 1))
-            if [[ "$FILE_INDEX" -lt 0 ]] || [[ "$FILE_INDEX" -ge "${#local_zips[@]}" ]]; then
-                print_error "Invalid selection."
-                rm -f "$TEMP_ZIP"
-                continue
-            fi
-            
             LOCAL_FILE="${local_zips[$FILE_INDEX]}"
             print_info "Using local mod archive: $(basename "$LOCAL_FILE")"
             cp "$LOCAL_FILE" "$TEMP_ZIP"
             DOWNLOAD_SUCCESS=true
+        else
+            MOD_INDEX=$((CHOICE - 1 - zip_count))
+            SELECTED_MOD="${installed_mods[$MOD_INDEX]}"
+            
+            if grep -q "^load_mod_${SELECTED_MOD}[ =]" "$WORLD_MT"; then
+                read -p "Mod '$SELECTED_MOD' is already configured in world.mt. Overwrite and activate? (y/n) " -n 1 -r
+                echo
+                if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+                    rm -f "$TEMP_ZIP"
+                    echo
+                    continue
+                fi
+                grep -v "^load_mod_${SELECTED_MOD}[ =]" "$WORLD_MT" > "${WORLD_MT}.tmp" && mv "${WORLD_MT}.tmp" "$WORLD_MT"
+            fi
+            
+            echo "load_mod_${SELECTED_MOD} = true" >> "$WORLD_MT"
+            print_info "Activated installed mod '$SELECTED_MOD' in world.mt"
+            rm -f "$TEMP_ZIP"
+            echo
+            continue
         fi
 
         if [[ "$DOWNLOAD_SUCCESS" == true ]]; then
@@ -283,15 +312,33 @@ if [[ "$INTERACTIVE" == true ]]; then
                     TARGET_MOD_DIR="$MODS_DIR/$CLEAN_MOD_NAME"
                     
                     if [ -d "$TARGET_MOD_DIR" ]; then
-                        print_warning "Mod '$CLEAN_MOD_NAME' already exists. Overwriting..."
-                        rm -rf "$TARGET_MOD_DIR"
+                        read -p "Mod '$CLEAN_MOD_NAME' files already exist. Overwrite? (y/n) " -n 1 -r
+                        echo
+                        if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+                            print_warning "Overwriting..."
+                            rm -rf "$TARGET_MOD_DIR"
+                            mv "$MOD_ROOT_DIR" "$TARGET_MOD_DIR"
+                            print_info "Installed mod to $TARGET_MOD_DIR"
+                        else
+                            print_info "Skipped overwriting mod files."
+                        fi
+                    else
+                        mv "$MOD_ROOT_DIR" "$TARGET_MOD_DIR"
+                        print_info "Installed mod to $TARGET_MOD_DIR"
                     fi
                     
-                    mv "$MOD_ROOT_DIR" "$TARGET_MOD_DIR"
-                    print_info "Installed mod to $TARGET_MOD_DIR"
-                    
                     # Ensure mod is enabled in world.mt
-                    if ! grep -q "^load_mod_${CLEAN_MOD_NAME} = true" "$WORLD_MT"; then
+                    if grep -q "^load_mod_${CLEAN_MOD_NAME}[ =]" "$WORLD_MT"; then
+                        read -p "Mod '$CLEAN_MOD_NAME' is already configured in world.mt. Overwrite and activate? (y/n) " -n 1 -r
+                        echo
+                        if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+                            grep -v "^load_mod_${CLEAN_MOD_NAME}[ =]" "$WORLD_MT" > "${WORLD_MT}.tmp" && mv "${WORLD_MT}.tmp" "$WORLD_MT"
+                            echo "load_mod_${CLEAN_MOD_NAME} = true" >> "$WORLD_MT"
+                            print_info "Enabled mod '$CLEAN_MOD_NAME' in world.mt"
+                        else
+                            print_info "Skipped enabling mod in world.mt."
+                        fi
+                    else
                         echo "load_mod_${CLEAN_MOD_NAME} = true" >> "$WORLD_MT"
                         print_info "Enabled mod '$CLEAN_MOD_NAME' in world.mt"
                     fi
@@ -317,6 +364,9 @@ fi
 
 # Setup map services if --map is specified
 if [ -n "$MAP_PORT" ]; then
+
+    check_port "$MAP_PORT" --kill || exit 1
+
     print_info "Setting up map rendering and hosting services on port $MAP_PORT..."
     
     # Open firewall for map server
