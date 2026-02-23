@@ -234,7 +234,12 @@ if [[ "$INTERACTIVE" == true ]]; then
             echo "[$((i + 1))] [ZIP] $(basename "${local_zips[$i]}")"
         done
         for i in "${!installed_mods[@]}"; do
-            echo "[$((i + 1 + zip_count))] [INSTALLED] ${installed_mods[$i]}"
+            mod_name="${installed_mods[$i]}"
+            status_tag="[INSTALLED]"
+            if grep -q "^load_mod_${mod_name}[ =]*true" "$WORLD_MT" 2>/dev/null; then
+                status_tag="[INSTALLED] [ENABLED]"
+            fi
+            echo "[$((i + 1 + zip_count))] $status_tag $mod_name"
         done
         
         read -p "your choice : " -r CHOICE
