@@ -58,6 +58,16 @@ if [ ! -f "$GEO_SCRIPT" ]; then
     exit 1
 fi
 
+print_info "Checking dependencies..."
+# Make sure required modules are available for the script
+if ! python3 -c "import rasterio, numpy, zstandard" &> /dev/null; then
+    print_info "Installing required Python packages (rasterio, numpy, zstandard)..."
+    pip3 install --user rasterio numpy zstandard || {
+        print_error "Failed to install Python dependencies"
+        exit 1
+    }
+fi
+
 print_info "Rendering GeoTIFF map for world: $WORLD"
 TEMP_IMAGE="$OUTPUT_DIR/map_temp.tif"
 
