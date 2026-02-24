@@ -104,7 +104,7 @@ sudo systemctl enable luanti-map-server@${WORLD}
 sudo systemctl start luanti-map-server@${WORLD}
 
 print_info "Map services started successfully!"
-echo "Map is now hosted at: http://$(hostname -I | awk '{print $1}'):${MAP_PORT}/map.png"
+echo "Map is now hosted at: http://$(hostname -I | awk '{print $1}'):${MAP_PORT}/map.tif"
 echo ""
 print_info "Service Management Commands:"
 echo "  Status:  sudo systemctl status luanti-map-render@${WORLD}"
