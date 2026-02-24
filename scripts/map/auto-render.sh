@@ -29,7 +29,7 @@ if [ -z "$WORLD" ]; then
     exit 1
 fi
 
-PROJECT_ROOT=$(get_project_root)
+# PROJECT_ROOT=$(get_project_root)
 RENDER_SCRIPT="$PROJECT_ROOT/scripts/map/render.sh"
 
 if [ ! -f "$RENDER_SCRIPT" ]; then

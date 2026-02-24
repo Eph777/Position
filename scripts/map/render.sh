@@ -38,6 +38,12 @@ OUTPUT_DIR="$WORLD_PATH/map_output"  # Store maps inside world folder
 OUTPUT_IMAGE="$OUTPUT_DIR/map.png"
 OUTPUT_WORLD_FILE="$OUTPUT_DIR/map.pgw"
 
+WORLD_SIZE=10000
+LEFT=-($WORLD_SIZE/2)
+RIGHT=($WORLD_SIZE/2)
+TOP=($WORLD_SIZE/2)
+BOTTOM=-($WORLD_SIZE/2)
+
 # Ensure output directory exists
 mkdir -p "$OUTPUT_DIR"
 
@@ -58,7 +64,7 @@ print_info "Rendering map for world: $WORLD"
 TEMP_IMAGE="$OUTPUT_DIR/map_temp.png"
 
 # Render to temp file first (Atomic update)
-$MAPPER_EXE --input "$WORLD_PATH" --output "$TEMP_IMAGE" --bgcolor "#ffffff" --colors "$COLORS_FILE" --geometry -5000:-5000+10000+10000
+$MAPPER_EXE --input "$WORLD_PATH" --output "$TEMP_IMAGE" --bgcolor "#ffffff" --colors "$COLORS_FILE" --geometry "$LEFT:$BOTTOM+$WORLD_SIZE+$WORLD_SIZE"
 
 if [ $? -eq 0 ]; then
     # Atomically move temp file to final file
@@ -78,8 +84,8 @@ if [ $? -eq 0 ]; then
     echo "0.0" >> "$OUTPUT_WORLD_FILE"
     echo "0.0" >> "$OUTPUT_WORLD_FILE"
     echo "-1.0" >> "$OUTPUT_WORLD_FILE"
-    echo "-5000.0" >> "$OUTPUT_WORLD_FILE"  # Top-Left X (Min X)
-    echo "5000.0" >> "$OUTPUT_WORLD_FILE"   # Top-Left Y (Max Z)
+    echo "$LEFT" >> "$OUTPUT_WORLD_FILE"  # Top-Left X (Min X)
+    echo "$TOP" >> "$OUTPUT_WORLD_FILE"   # Top-Left Y (Max Z)
     
     print_info "World file generated: $OUTPUT_WORLD_FILE"
 else
