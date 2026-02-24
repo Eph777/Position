@@ -13,7 +13,8 @@ import zlib
 import zstandard as zstd
 
 # Add codec to path
-codec_src_path = os.path.join(os.path.dirname(__file__), 'codec', 'src')
+import pathlib
+codec_src_path = os.path.join(pathlib.Path(__file__).parent.resolve(), 'codec', 'src')
 sys.path.append(codec_src_path)
 try:
     from luanti_map_builder.decode_postition import getIntegerAsBlock

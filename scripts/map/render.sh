@@ -58,10 +58,11 @@ if [ ! -f "$GEO_SCRIPT" ]; then
     exit 1
 fi
 
-CODEC_DIR="$PROJECT_ROOT/scripts/map/codec"
+SCRIPT_DIR=$(dirname "$(realpath "$0")")
+CODEC_DIR="$SCRIPT_DIR/codec"
 if [ ! -d "$CODEC_DIR" ]; then
     print_info "Codec not found. Cloning Luanti-MapBlock-Codec..."
-    git clone https://github.com/chenxu2394/Luanti-MapBlock-Codec "$CODEC_DIR" || {
+    git clone https://github.com/chenxu2394/Luanti-MapBlock-Codec.git "$CODEC_DIR" || {
         print_error "Failed to clone Luanti-MapBlock-Codec"
         exit 1
     }
