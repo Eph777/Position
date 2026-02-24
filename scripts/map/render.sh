@@ -58,6 +58,25 @@ if [ ! -f "$GEO_SCRIPT" ]; then
     exit 1
 fi
 
+# Ensure virtual environment exists
+if [ ! -d "$PROJECT_ROOT/venv" ]; then
+    print_info "Python virtual environment not found in $PROJECT_ROOT/venv."
+    print_info "Creating it now to install mapping dependencies..."
+    python3 -m venv "$PROJECT_ROOT/venv" || {
+        print_error "Failed to create python virtual environment"
+        exit 1
+    }
+fi
+
+# Check if dependencies are installed in the venv
+if ! "$PROJECT_ROOT/venv/bin/python3" -c "import rasterio, numpy, zstandard" &> /dev/null; then
+    print_info "Installing missing Python dependencies in venv..."
+    "$PROJECT_ROOT/venv/bin/pip" install rasterio numpy zstandard || {
+        print_error "Failed to install Python dependencies in venv"
+        exit 1
+    }
+fi
+
 print_info "Rendering GeoTIFF map for world: $WORLD"
 TEMP_IMAGE="$OUTPUT_DIR/map_temp.tif"
 

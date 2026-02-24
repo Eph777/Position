@@ -138,7 +138,6 @@ if [ "$UPDATE" = true ]; then
         print_info "Updating Python dependencies..."
         source "$PROJECT_ROOT/venv/bin/activate"
         pip install --upgrade -r requirements.txt
-        pip install rasterio numpy zstandard
     fi
     
     # Update mod

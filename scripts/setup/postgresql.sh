@@ -155,7 +155,6 @@ source venv/bin/activate
 print_info "Installing Python dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
-pip install rasterio numpy zstandard
 
 # Create .env file
 print_info "Creating .env configuration file..."
