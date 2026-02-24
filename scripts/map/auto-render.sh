@@ -23,13 +23,14 @@ source $PROJECT_ROOT/src/lib/common.sh
 
 WORLD="$1"
 INTERVAL="${2:-15}"  # Default 15 seconds
+MAP_SIZE="${3:-10000}"
 
 if [ -z "$WORLD" ]; then
-    print_error "Usage: $0 <world_name> [interval_seconds]"
+    print_error "Usage: $0 <world_name> [interval_seconds] [map_size]"
     exit 1
 fi
 
-PROJECT_ROOT=$(get_project_root)
+# PROJECT_ROOT=$(get_project_root)
 RENDER_SCRIPT="$PROJECT_ROOT/scripts/map/render.sh"
 
 if [ ! -f "$RENDER_SCRIPT" ]; then
@@ -41,7 +42,7 @@ print_info "Starting auto-render loop for world: $WORLD (interval: ${INTERVAL}s)
 
 while true; do
     print_info "Starting render..."
-    $RENDER_SCRIPT "$WORLD"
+    $RENDER_SCRIPT "$WORLD" "$MAP_SIZE"
     print_info "Sleeping ${INTERVAL}s..."
     sleep "$INTERVAL"
 done
