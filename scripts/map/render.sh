@@ -32,11 +32,12 @@ fi
 USER_HOME=$(get_user_home)
 
 # Configuration
-GEO_SCRIPT="$PROJECT_ROOT/scripts/map/generate_geotiff.py"
+MAPPER_EXE="$USER_HOME/minetest-mapper/minetestmapper"
 COLORS_FILE="$USER_HOME/minetest-mapper/colors.txt"
 WORLD_PATH="$USER_HOME/snap/luanti/common/.minetest/worlds/$WORLD"
 OUTPUT_DIR="$WORLD_PATH/map_output"  # Store maps inside world folder
-OUTPUT_IMAGE="$OUTPUT_DIR/map.tif"
+OUTPUT_IMAGE="$OUTPUT_DIR/map.png"
+OUTPUT_WORLD_FILE="$OUTPUT_DIR/map.pgw"
 
 LEFT=$((-WORLD_SIZE/2))
 RIGHT=$((WORLD_SIZE/2))
@@ -52,54 +53,41 @@ if [ ! -f "$WORLD_PATH/map.sqlite" ]; then
     exit 1
 fi
 
-# Check if python script exists
-if [ ! -f "$GEO_SCRIPT" ]; then
-    print_error "Script not found at $GEO_SCRIPT"
+# Check if mapper executable exists
+if [ ! -f "$MAPPER_EXE" ]; then
+    print_error "Mapper executable not found at $MAPPER_EXE"
+    print_info "Run scripts/setup/mapper.sh to install minetest-mapper"
     exit 1
 fi
 
-SCRIPT_DIR=$(dirname "$(realpath "$0")")
-CODEC_DIR="$SCRIPT_DIR/codec"
-if [ ! -d "$CODEC_DIR" ]; then
-    print_info "Codec not found. Cloning Luanti-MapBlock-Codec..."
-    git clone https://github.com/chenxu2394/Luanti-MapBlock-Codec.git "$CODEC_DIR" || {
-        print_error "Failed to clone Luanti-MapBlock-Codec"
-        exit 1
-    }
-fi
-
-# Ensure virtual environment exists
-if [ ! -d "$PROJECT_ROOT/venv" ]; then
-    print_info "Python virtual environment not found in $PROJECT_ROOT/venv."
-    print_info "Creating it now to install mapping dependencies..."
-    python3 -m venv "$PROJECT_ROOT/venv" || {
-        print_error "Failed to create python virtual environment"
-        exit 1
-    }
-fi
-
-# Check if dependencies are installed in the venv
-if ! "$PROJECT_ROOT/venv/bin/python3" -c "import rasterio, numpy, zstandard" &> /dev/null; then
-    print_info "Installing missing Python dependencies in venv..."
-    "$PROJECT_ROOT/venv/bin/pip" install rasterio numpy zstandard || {
-        print_error "Failed to install Python dependencies in venv"
-        exit 1
-    }
-fi
-
-print_info "Rendering GeoTIFF map for world: $WORLD"
-TEMP_IMAGE="$OUTPUT_DIR/map_temp.tif"
+print_info "Rendering map for world: $WORLD"
+TEMP_IMAGE="$OUTPUT_DIR/map_temp.png"
 
 # Render to temp file first (Atomic update)
-# Assumes venv is deployed to PROJECT_ROOT by deploy.sh
-"$PROJECT_ROOT/venv/bin/python3" "$GEO_SCRIPT" "$WORLD_PATH" "$TEMP_IMAGE" \
-    --colors "$COLORS_FILE" \
-    --left "$LEFT" --top "$TOP" --right "$RIGHT" --bottom "$BOTTOM"
+$MAPPER_EXE --input "$WORLD_PATH" --output "$TEMP_IMAGE" --bgcolor "#ffffff" --colors "$COLORS_FILE" --geometry "$LEFT:$BOTTOM+$WORLD_SIZE+$WORLD_SIZE"
 
 if [ $? -eq 0 ]; then
     # Atomically move temp file to final file
     mv "$TEMP_IMAGE" "$OUTPUT_IMAGE"
-    print_info "GeoTIFF rendered successfully: $OUTPUT_IMAGE"
+    print_info "Map rendered successfully: $OUTPUT_IMAGE"
+    
+    # Generate World File (.pgw) for QGIS
+    # Format:
+    # Line 1: x-scale (meters per pixel) = 1.0
+    # Line 2: y-rotation = 0
+    # Line 3: x-rotation = 0
+    # Line 4: y-scale (meters per pixel, negative because image Y is down) = -1.0
+    # Line 5: Upper-left X coordinate
+    # Line 6: Upper-left Y coordinate
+    
+    echo "1.0" > "$OUTPUT_WORLD_FILE"
+    echo "0.0" >> "$OUTPUT_WORLD_FILE"
+    echo "0.0" >> "$OUTPUT_WORLD_FILE"
+    echo "-1.0" >> "$OUTPUT_WORLD_FILE"
+    echo "$LEFT" >> "$OUTPUT_WORLD_FILE"  # Top-Left X (Min X)
+    echo "$TOP" >> "$OUTPUT_WORLD_FILE"   # Top-Left Y (Max Z)
+    
+    print_info "World file generated: $OUTPUT_WORLD_FILE"
 else
     print_error "Rendering failed!"
     exit 1
