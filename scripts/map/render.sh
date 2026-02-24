@@ -58,21 +58,12 @@ if [ ! -f "$GEO_SCRIPT" ]; then
     exit 1
 fi
 
-print_info "Checking dependencies..."
-# Make sure required modules are available for the script
-if ! python3 -c "import rasterio, numpy, zstandard" &> /dev/null; then
-    print_info "Installing required Python packages (rasterio, numpy, zstandard)..."
-    pip3 install --user rasterio numpy zstandard || {
-        print_error "Failed to install Python dependencies"
-        exit 1
-    }
-fi
-
 print_info "Rendering GeoTIFF map for world: $WORLD"
 TEMP_IMAGE="$OUTPUT_DIR/map_temp.tif"
 
 # Render to temp file first (Atomic update)
-python3 "$GEO_SCRIPT" "$WORLD_PATH" "$TEMP_IMAGE" \
+# Assumes venv is deployed to PROJECT_ROOT by deploy.sh
+"$PROJECT_ROOT/venv/bin/python3" "$GEO_SCRIPT" "$WORLD_PATH" "$TEMP_IMAGE" \
     --colors "$COLORS_FILE" \
     --left "$LEFT" --top "$TOP" --right "$RIGHT" --bottom "$BOTTOM"
 
