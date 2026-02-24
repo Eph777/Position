@@ -108,12 +108,11 @@ def main():
     print(f"Finding MapBlocks in BBox [{min_bx}..{max_bx}, {min_bz}..{max_bz}]...")
     
     # First, get all positions to group by columns
-    cursor.execute("SELECT pos FROM blocks")
-    columns = {} # (bx, bz) -> list of (pos, by)
+    cursor.execute("SELECT x, y, z FROM blocks")
+    columns = {} # (bx, bz) -> list of (x, y, z)
     
     for row in cursor:
-        pos = row[0]
-        bx, by, bz = getIntegerAsBlock(pos)
+        bx, by, bz = row[0], row[1], row[2]
         
         if bx < min_bx or bx > max_bx or bz < min_bz or bz > max_bz:
             continue
@@ -125,7 +124,7 @@ def main():
         col_key = (bx, bz)
         if col_key not in columns:
             columns[col_key] = []
-        columns[col_key].append((pos, by))
+        columns[col_key].append((bx, by, bz))
 
     profile = {
         'driver': 'GTiff',
@@ -169,11 +168,11 @@ def main():
             
             col_filled = np.zeros((16, 16), dtype=bool)
             
-            for pos, by in blocks_in_col:
+            for f_bx, f_by, f_bz in blocks_in_col:
                 if col_filled.all():
                     break
                 
-                cursor.execute("SELECT data FROM blocks WHERE pos=?", (pos,))
+                cursor.execute("SELECT data FROM blocks WHERE x=? AND y=? AND z=?", (f_bx, f_by, f_bz))
                 data_row = cursor.fetchone()
                 if not data_row:
                     continue
