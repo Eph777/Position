@@ -97,8 +97,7 @@ if [ "$STATUS_ONLY" = true ]; then
     
     print_info "Services:"
     systemctl status luanti-tracker-postgresql --no-pager | head -n 3 || echo "  luanti-tracker-postgresql: Not found"
-    systemctl status luanti-map-render --no-pager | head -n 3 || echo "  luanti-map-render: Not found"
-    systemctl status luanti-map-server --no-pager | head -n 3 || echo "  luanti-map-server: Not found"
+    systemctl status luanti-mapserver --no-pager | head -n 3 || echo "  luanti-mapserver: Not found"
     
     echo ""
     print_info "Active Ports:"
@@ -150,8 +149,7 @@ if [ "$UPDATE" = true ]; then
     # Restart services
     print_info "Restarting services..."
     sudo systemctl restart luanti-tracker-postgresql 2>/dev/null || true
-    sudo systemctl restart luanti-map-render 2>/dev/null || true
-    sudo systemctl restart luanti-map-server 2>/dev/null || true
+    sudo systemctl restart luanti-mapserver 2>/dev/null || true
     
     print_info "Update complete!"
     exit 0
@@ -185,8 +183,8 @@ print_info "=== Step 2/4: Backend Migration ==="
 "$PROJECT_ROOT/scripts/server/migrate-backend.sh" "$WORLD_NAME" --force
 
 # Step 3: Setup mapper
-print_info "=== Step 3/4: Map Renderer Setup ==="
-"$PROJECT_ROOT/scripts/setup/mapper.sh" "$WORLD_NAME"
+print_info "=== Step 3/4: Mapserver Setup ==="
+"$PROJECT_ROOT/scripts/setup/mapserver.sh" "$WORLD_NAME"
 
 # Step 4: Setup map hosting
 print_info "=== Step 4/4: Map Hosting Setup ==="
@@ -211,7 +209,7 @@ echo "     Server: $(hostname -I | awk '{print $1}')"
 echo "     Port: 30000"
 echo ""
 echo "  3. View map:"
-echo "     http://$(hostname -I | awk '{print $1}'):8080/map.png"
+echo "     http://$(hostname -I | awk '{print $1}'):8080/"
 echo ""
 print_info "Configuration saved in: $PROJECT_ROOT/.env"
 echo ""
