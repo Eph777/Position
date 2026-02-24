@@ -22,9 +22,10 @@ PROJECT_ROOT=$(cat /root/.proj_root)
 source $PROJECT_ROOT/src/lib/common.sh
 
 WORLD="$1"
+WORLD_SIZE="${2:-10000}"
 
 if [ -z "$WORLD" ]; then
-    print_error "Usage: $0 <world_name>"
+    print_error "Usage: $0 <world_name> [world_size]"
     exit 1
 fi
 
@@ -38,7 +39,6 @@ OUTPUT_DIR="$WORLD_PATH/map_output"  # Store maps inside world folder
 OUTPUT_IMAGE="$OUTPUT_DIR/map.png"
 OUTPUT_WORLD_FILE="$OUTPUT_DIR/map.pgw"
 
-WORLD_SIZE=10000
 LEFT=$((-WORLD_SIZE/2))
 RIGHT=$((WORLD_SIZE/2))
 TOP=$((WORLD_SIZE/2))

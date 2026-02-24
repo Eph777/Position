@@ -24,11 +24,13 @@ source $PROJECT_ROOT/src/lib/common.sh
 WORLD="$1"
 MAP_PORT="${2:-8080}"  # Default to 8080 if not specified
 RENDER_INTERVAL="${3:-15}"  # Default to 15 seconds if not specified
+MAP_SIZE="${4:-10000}"   # Default size to 10000
 
 if [ -z "$WORLD" ]; then
-    print_error "Usage: $0 <world_name> [map_port] [render_interval]"
+    print_error "Usage: $0 <world_name> [map_port] [render_interval] [map_size]"
     echo "  Default port: 8080"
     echo "  Default render interval: 15s"
+    echo "  Default map size: 10000"
     exit 1
 fi
 
@@ -65,7 +67,7 @@ Description=Luanti Map Auto-Renderer - ${WORLD} (${RENDER_INTERVAL}s Interval)
 Type=simple
 User=${SERVICE_USER}
 WorkingDirectory=$PROJECT_ROOT
-ExecStart=/bin/bash $PROJECT_ROOT/scripts/map/auto-render.sh $WORLD $RENDER_INTERVAL
+ExecStart=/bin/bash $PROJECT_ROOT/scripts/map/auto-render.sh $WORLD $RENDER_INTERVAL $MAP_SIZE
 Restart=always
 
 [Install]
