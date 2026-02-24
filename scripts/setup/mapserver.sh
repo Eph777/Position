@@ -39,9 +39,17 @@ fi
 
 print_info "=== Minetest Mapserver Setup ==="
 
+# Detect Architecture
+ARCH=$(uname -m)
+case $ARCH in
+    x86_64|amd64) MAPSERVER_ARCH="amd64" ;;
+    aarch64|arm64) MAPSERVER_ARCH="arm64" ;;
+    *) print_error "Unsupported architecture: $ARCH"; exit 1 ;;
+esac
+
 # Download the latest mapserver release
-print_info "Fetching latest Mapserver release URL..."
-RELEASE_URL=$(curl -s https://api.github.com/repos/minetest-mapserver/mapserver/releases/latest | grep "browser_download_url" | grep "linux_amd64\.tar\.gz" | cut -d '"' -f 4)
+print_info "Fetching latest Mapserver release URL for linux_$MAPSERVER_ARCH..."
+RELEASE_URL=$(curl -s https://api.github.com/repos/minetest-mapserver/mapserver/releases/latest | grep "browser_download_url" | grep "linux_${MAPSERVER_ARCH}\.tar\.gz" | cut -d '"' -f 4)
 
 if [ -z "$RELEASE_URL" ]; then
     print_error "Failed to fetch Mapserver release URL!"
