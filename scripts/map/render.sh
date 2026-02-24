@@ -58,6 +58,15 @@ if [ ! -f "$GEO_SCRIPT" ]; then
     exit 1
 fi
 
+CODEC_DIR="$PROJECT_ROOT/scripts/map/codec"
+if [ ! -d "$CODEC_DIR" ]; then
+    print_info "Codec not found. Cloning Luanti-MapBlock-Codec..."
+    git clone https://github.com/chenxu2394/Luanti-MapBlock-Codec "$CODEC_DIR" || {
+        print_error "Failed to clone Luanti-MapBlock-Codec"
+        exit 1
+    }
+fi
+
 # Ensure virtual environment exists
 if [ ! -d "$PROJECT_ROOT/venv" ]; then
     print_info "Python virtual environment not found in $PROJECT_ROOT/venv."

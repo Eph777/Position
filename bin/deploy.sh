@@ -188,6 +188,12 @@ print_info "=== Step 2/4: Backend Migration ==="
 print_info "=== Step 3/4: Map Renderer Setup ==="
 "$PROJECT_ROOT/scripts/setup/mapper.sh" "$WORLD_NAME"
 
+CODEC_DIR="$PROJECT_ROOT/scripts/map/codec"
+if [ ! -d "$CODEC_DIR" ]; then
+    print_info "Cloning Luanti-MapBlock-Codec..."
+    git clone https://github.com/chenxu2394/Luanti-MapBlock-Codec "$CODEC_DIR"
+fi
+
 # Step 4: Setup map hosting
 print_info "=== Step 4/4: Map Hosting Setup ==="
 "$PROJECT_ROOT/scripts/map/setup-hosting.sh" "$WORLD_NAME"
