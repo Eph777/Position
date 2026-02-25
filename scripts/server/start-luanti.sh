@@ -30,7 +30,6 @@ PORT=30000
 IS_SERVICE=false
 MAP_PORT=""
 MAP_INTERVAL="15"
-MAP_SIZE="10000"
 INTERACTIVE=false
 
 # Parse Positional Arguments
@@ -57,7 +56,6 @@ while [[ $# -gt 0 ]]; do
             echo "  --service                Create and start as systemd service"
             echo "  --map PORT               Also start map hosting on TCP PORT"
             echo "  --map-refresh SECONDS    Map render interval (Default: 15s)"
-            echo "  --map-size SIZE          Map render bounds size (Default: 10000)"
             exit 0
             ;;
         -i|--interactive)
@@ -82,14 +80,6 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             MAP_INTERVAL="$2"
-            shift 2
-            ;;
-        --map-size)
-            if [[ -z "$2" || "$2" == -* ]]; then
-                echo "Error: --map-size requires a size argument"
-                exit 1
-            fi
-            MAP_SIZE="$2"
             shift 2
             ;;
         *)
@@ -152,9 +142,6 @@ if [[ "$INTERACTIVE" == true ]]; then
     if [[ -n "$MAP_PORT" ]]; then
         read -p "map refresh interval seconds (default: $MAP_INTERVAL) : " -r
         if [[ -n "$REPLY" ]]; then MAP_INTERVAL="$REPLY"; fi
-        
-        read -p "map world size (default: $MAP_SIZE) : " -r
-        if [[ -n "$REPLY" ]]; then MAP_SIZE="$REPLY"; fi
     fi
 
     curr_svc="n"
@@ -178,7 +165,6 @@ if [ -z "$WORLD" ]; then
     echo "  With --service: Creates and starts systemd service"
     echo "  With --map PORT: Also starts map rendering and hosting on specified port"
     echo "  With --map-refresh INTERVAL: Set map refresh interval in seconds"
-    echo "  With --map-size SIZE: Set map render size"
     exit 1
 fi
 
@@ -411,7 +397,7 @@ if [ -n "$MAP_PORT" ]; then
     
     # Run map hosting setup script
     print_info "Configuring map services..."
-    "$PROJECT_ROOT/scripts/map/setup-hosting.sh" "$WORLD" "$MAP_PORT" "$MAP_INTERVAL" "$MAP_SIZE" || {
+    "$PROJECT_ROOT/scripts/map/setup-hosting.sh" "$WORLD" "$MAP_PORT" "$MAP_INTERVAL" || {
         print_error "Failed to setup map services"
         exit 1
     }

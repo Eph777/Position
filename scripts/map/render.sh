@@ -22,10 +22,9 @@ PROJECT_ROOT=$(cat /root/.proj_root)
 source $PROJECT_ROOT/src/lib/common.sh
 
 WORLD="$1"
-WORLD_SIZE="${2:-10000}"
 
 if [ -z "$WORLD" ]; then
-    print_error "Usage: $0 <world_name> [world_size]"
+    print_error "Usage: $0 <world_name>"
     exit 1
 fi
 
@@ -39,10 +38,22 @@ OUTPUT_DIR="$WORLD_PATH/map_output"  # Store maps inside world folder
 OUTPUT_IMAGE="$OUTPUT_DIR/map.png"
 OUTPUT_WORLD_FILE="$OUTPUT_DIR/map.pgw"
 
-LEFT=$((-WORLD_SIZE/2))
-RIGHT=$((WORLD_SIZE/2))
-TOP=$((WORLD_SIZE/2))
-BOTTOM=$((-WORLD_SIZE/2))
+# Get actual bounds of the entire map
+EXTENT_STR=$($MAPPER_EXE --extent --input "$WORLD_PATH" 2>&1)
+if [[ "$EXTENT_STR" =~ ([-0-9]+):([-0-9]+)\+([0-9]+)\+([0-9]+) ]]; then
+    ACTUAL_LEFT="${BASH_REMATCH[1]}"
+    ACTUAL_BOTTOM="${BASH_REMATCH[2]}"
+    ACTUAL_WIDTH="${BASH_REMATCH[3]}"
+    ACTUAL_HEIGHT="${BASH_REMATCH[4]}"
+    ACTUAL_TOP=$((ACTUAL_BOTTOM + ACTUAL_HEIGHT))
+    
+    # For reliable georeferencing without cropping issues, we map the exact known bounds
+    GEOM_ARG="--geometry $ACTUAL_LEFT:$ACTUAL_BOTTOM+$ACTUAL_WIDTH+$ACTUAL_HEIGHT"
+else
+    print_error "Could not determine map extent. Got: '$EXTENT_STR'"
+    exit 1
+fi
+
 
 # Ensure output directory exists
 mkdir -p "$OUTPUT_DIR"
@@ -64,7 +75,7 @@ print_info "Rendering map for world: $WORLD"
 TEMP_IMAGE="$OUTPUT_DIR/map_temp.png"
 
 # Render to temp file first (Atomic update)
-$MAPPER_EXE --input "$WORLD_PATH" --output "$TEMP_IMAGE" --bgcolor "#ffffff" --colors "$COLORS_FILE" --geometry "$LEFT:$BOTTOM+$WORLD_SIZE+$WORLD_SIZE"
+$MAPPER_EXE --input "$WORLD_PATH" --output "$TEMP_IMAGE" --bgcolor "#ffffff" --colors "$COLORS_FILE" $GEOM_ARG
 
 if [ $? -eq 0 ]; then
     # Atomically move temp file to final file
@@ -84,8 +95,8 @@ if [ $? -eq 0 ]; then
     echo "0.0" >> "$OUTPUT_WORLD_FILE"
     echo "0.0" >> "$OUTPUT_WORLD_FILE"
     echo "-1.0" >> "$OUTPUT_WORLD_FILE"
-    echo "$LEFT" >> "$OUTPUT_WORLD_FILE"  # Top-Left X (Min X)
-    echo "$TOP" >> "$OUTPUT_WORLD_FILE"   # Top-Left Y (Max Z)
+    echo "$ACTUAL_LEFT" >> "$OUTPUT_WORLD_FILE"  # True Top-Left X
+    echo "$ACTUAL_TOP" >> "$OUTPUT_WORLD_FILE"   # True Top-Left Y
     
     print_info "World file generated: $OUTPUT_WORLD_FILE"
 else
