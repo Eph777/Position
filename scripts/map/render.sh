@@ -22,10 +22,9 @@ PROJECT_ROOT=$(cat /root/.proj_root)
 source $PROJECT_ROOT/src/lib/common.sh
 
 WORLD="$1"
-WORLD_SIZE="${2:-10000}"
 
 if [ -z "$WORLD" ]; then
-    print_error "Usage: $0 <world_name> [world_size]"
+    print_error "Usage: $0 <world_name>"
     exit 1
 fi
 
