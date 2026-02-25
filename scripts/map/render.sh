@@ -40,8 +40,8 @@ OUTPUT_IMAGE="$OUTPUT_DIR/map.png"
 OUTPUT_WORLD_FILE="$OUTPUT_DIR/map.pgw"
 
 # Get actual bounds of the entire map
-EXTENT_STR=$($MAPPER_EXE --extent --input "$WORLD_PATH")
-if [[ "$EXTENT_STR" =~ ^([-0-9]+):([-0-9]+)\+([0-9]+)\+([0-9]+)$ ]]; then
+EXTENT_STR=$($MAPPER_EXE --extent --input "$WORLD_PATH" 2>&1)
+if [[ "$EXTENT_STR" =~ ([-0-9]+):([-0-9]+)\+([0-9]+)\+([0-9]+) ]]; then
     ACTUAL_LEFT="${BASH_REMATCH[1]}"
     ACTUAL_BOTTOM="${BASH_REMATCH[2]}"
     ACTUAL_WIDTH="${BASH_REMATCH[3]}"
@@ -51,7 +51,7 @@ if [[ "$EXTENT_STR" =~ ^([-0-9]+):([-0-9]+)\+([0-9]+)\+([0-9]+)$ ]]; then
     # For reliable georeferencing without cropping issues, we map the exact known bounds
     GEOM_ARG="--geometry $ACTUAL_LEFT:$ACTUAL_BOTTOM+$ACTUAL_WIDTH+$ACTUAL_HEIGHT"
 else
-    print_error "Could not determine map extent"
+    print_error "Could not determine map extent. Got: '$EXTENT_STR'"
     exit 1
 fi
 
