@@ -28,8 +28,22 @@ MODS_DIR="$USER_HOME/snap/luanti/common/.minetest/mods"
 print_info "=== Minetest Mapserver Setup ==="
 
 # Step 1: Download Mapserver Binary
-# Using version v4.8.0 for Linux AMD64
-MAPSERVER_URL="https://github.com/minetest-mapserver/mapserver/releases/download/v4.8.0/mapserver_4.8.0_linux_amd64.tar.gz"
+# Using version v4.8.0
+VERSION="4.8.0"
+
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+
+if [ "$ARCH" = "x86_64" ]; then
+    ARCH="amd64"
+elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+    ARCH="arm64"
+elif [[ "$ARCH" == armv* ]]; then
+    ARCH="armv7"
+fi
+
+MAPSERVER_URL="https://github.com/minetest-mapserver/mapserver/releases/download/v${VERSION}/mapserver_${VERSION}_${OS}_${ARCH}.tar.gz"
+print_info "Attempting to download Mapserver for ${OS}_${ARCH}..."
 
 if [ ! -d "$MAPSERVER_DIR" ]; then
     print_info "Creating directory $MAPSERVER_DIR..."
