@@ -98,7 +98,7 @@ Description=Luanti Mapserver - ${WORLD} (Port ${MAP_PORT})
 [Service]
 Type=simple
 User=${SERVICE_USER}
-WorkingDirectory=${MAP_OUTPUT_DIR}
+WorkingDirectory=${WORLD_PATH}
 ExecStart=${MAPSERVER_BIN}
 Restart=always
 
