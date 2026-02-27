@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# Setup map hosting services (renderer + HTTP server)
+# Setup map hosting services (Mapserver)
 # Usage: ./setup-hosting.sh <world_name> [map_port]
 
 # Load common functions
@@ -23,11 +23,10 @@ source $PROJECT_ROOT/src/lib/common.sh
 
 WORLD="$1"
 MAP_PORT="${2:-8080}"  # Default to 8080 if not specified
-RENDER_INTERVAL="${3:-15}"  # Default to 15 seconds if not specified
+
 if [ -z "$WORLD" ]; then
-    print_error "Usage: $0 <world_name> [map_port] [render_interval]"
+    print_error "Usage: $0 <world_name> [map_port]"
     echo "  Default port: 8080"
-    echo "  Default render interval: 15s"
     exit 1
 fi
 
@@ -36,7 +35,15 @@ SERVICE_USER=$(get_current_user)
 USER_HOME=$(get_user_home)
 PROJECT_ROOT=$(get_project_root)
 WORLD_PATH="$USER_HOME/snap/luanti/common/.minetest/worlds/$WORLD"
-MAP_OUTPUT_DIR="$WORLD_PATH/map_output"  # Store maps inside world folder
+MAP_OUTPUT_DIR="$WORLD_PATH/mapserver"  # Store mapserver data inside world folder
+MAPSERVER_BIN="$USER_HOME/minetest-mapserver/mapserver"
+
+# Ensure Mapserver Bin exists
+if [ ! -f "$MAPSERVER_BIN" ]; then
+    print_error "Mapserver binary not found at $MAPSERVER_BIN"
+    print_info "Please run scripts/setup/mapserver.sh first"
+    exit 1
+fi
 
 # Ensure world exists
 if [ ! -d "$WORLD_PATH" ]; then
@@ -52,36 +59,47 @@ mkdir -p "$MAP_OUTPUT_DIR"
 print_info "Setting permissions for $SERVICE_USER on $MAP_OUTPUT_DIR..."
 sudo chown -R "$SERVICE_USER:$SERVICE_USER" "$MAP_OUTPUT_DIR"
 
-print_info "Setting up real-time map services..."
+print_info "Configuring Mapserver..."
 
-# Create Map Renderer Service (world-specific)
-print_info "Creating luanti-map-render@${WORLD}.service..."
-sudo tee /etc/systemd/system/luanti-map-render@${WORLD}.service > /dev/null <<EOF
-[Unit]
-Description=Luanti Map Auto-Renderer - ${WORLD} (${RENDER_INTERVAL}s Interval)
-
-[Service]
-Type=simple
-User=${SERVICE_USER}
-WorkingDirectory=$PROJECT_ROOT
-ExecStart=/bin/bash $PROJECT_ROOT/scripts/map/auto-render.sh $WORLD $RENDER_INTERVAL
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
+# Generate mapserver.json config
+MAPSERVER_CONFIG="$MAP_OUTPUT_DIR/mapserver.json"
+cat > "$MAPSERVER_CONFIG" <<EOF
+{
+  "web": {
+    "listen": "0.0.0.0:${MAP_PORT}"
+  },
+  "map": {
+    "worldpath": "${WORLD_PATH}",
+    "bgcolor": "#ffffff"
+  }
+}
 EOF
 
-# Create HTTP Map Server Service (world-specific)
-print_info "Creating luanti-map-server@${WORLD}.service..."
-sudo tee /etc/systemd/system/luanti-map-server@${WORLD}.service > /dev/null <<EOF
+print_info "Setting up real-time map services..."
+
+# Clean up old services if they exist
+if systemctl is-active --quiet "luanti-map-render@${WORLD}"; then
+    print_info "Stopping legacy luanti-map-render service..."
+    sudo systemctl stop "luanti-map-render@${WORLD}"
+    sudo systemctl disable "luanti-map-render@${WORLD}"
+fi
+if systemctl is-active --quiet "luanti-map-server@${WORLD}"; then
+    print_info "Stopping legacy luanti-map-server service..."
+    sudo systemctl stop "luanti-map-server@${WORLD}"
+    sudo systemctl disable "luanti-map-server@${WORLD}"
+fi
+
+# Create Map Server Service (world-specific)
+print_info "Creating luanti-mapserver@${WORLD}.service..."
+sudo tee /etc/systemd/system/luanti-mapserver@${WORLD}.service > /dev/null <<EOF
 [Unit]
-Description=Luanti Map HTTP Server - ${WORLD} (Port ${MAP_PORT})
+Description=Luanti Mapserver - ${WORLD} (Port ${MAP_PORT})
 
 [Service]
 Type=simple
 User=${SERVICE_USER}
-WorkingDirectory=$MAP_OUTPUT_DIR
-ExecStart=/usr/bin/python3 $PROJECT_ROOT/src/range_server.py ${MAP_PORT}
+WorkingDirectory=${MAP_OUTPUT_DIR}
+ExecStart=${MAPSERVER_BIN} --config ${MAPSERVER_CONFIG}
 Restart=always
 
 [Install]
@@ -95,16 +113,13 @@ sudo ufw allow ${MAP_PORT}/tcp
 # Start Services
 print_info "Starting services..."
 sudo systemctl daemon-reload
-sudo systemctl enable luanti-map-render@${WORLD}
-sudo systemctl start luanti-map-render@${WORLD}
-sudo systemctl enable luanti-map-server@${WORLD}
-sudo systemctl start luanti-map-server@${WORLD}
+sudo systemctl enable luanti-mapserver@${WORLD}
+sudo systemctl start luanti-mapserver@${WORLD}
 
 print_info "Map services started successfully!"
-echo "Map is now hosted at: http://$(hostname -I | awk '{print $1}'):${MAP_PORT}/map.png"
+echo "Map is now hosted at: http://$(hostname -I | awk '{print $1}'):${MAP_PORT}/"
+echo "QGIS XYZ Tile URL: http://$(hostname -I | awk '{print $1}'):${MAP_PORT}/api/map/tiles/{z}/{x}/{y}"
 echo ""
 print_info "Service Management Commands:"
-echo "  Status:  sudo systemctl status luanti-map-render@${WORLD}"
-echo "  Status:  sudo systemctl status luanti-map-server@${WORLD}"
-echo "  Logs:    sudo journalctl -u luanti-map-render@${WORLD} -f"
-echo "  Logs:    sudo journalctl -u luanti-map-server@${WORLD} -f"
+echo "  Status:  sudo systemctl status luanti-mapserver@${WORLD}"
+echo "  Logs:    sudo journalctl -u luanti-mapserver@${WORLD} -f"
