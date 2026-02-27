@@ -28,8 +28,8 @@ MODS_DIR="$USER_HOME/snap/luanti/common/.minetest/mods"
 print_info "=== Minetest Mapserver Setup ==="
 
 # Step 1: Download Mapserver Binary
-# Using version v4.8.0
-VERSION="4.8.0"
+# Using version v4.10.0
+VERSION="4.10.0"
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
