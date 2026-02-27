@@ -47,6 +47,7 @@ fi
 # Parse Flags
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --help)
             echo "Usage: $0 [-i|--interactive] <world_name> [port] [--service] [--map MAP_PORT]"
             echo "  -i, --interactive        Run in interactive mode"
             echo "  <world_name>             Name of the world folder (Required unless interactive)"
