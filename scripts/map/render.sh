@@ -84,7 +84,8 @@ for coord in $CHUNKS; do
     Z=${coord#*,}
     TOP=$((Z + HEIGHT))  # Need this for QGIS pgw!
 
-    GEOM_ARG="--geometry $X:$Z+$WIDTH+$HEIGHT"
+    # The format is `x:z+w+h`
+    GEOM_ARG="--geometry ${X}:${Z}+${WIDTH}+${HEIGHT}"
     TILE_IMAGE="$OUTPUT_DIR/chunk_${X}_${Z}.png"
     TILE_PGW="$OUTPUT_DIR/chunk_${X}_${Z}.pgw"
     
@@ -94,12 +95,16 @@ for coord in $CHUNKS; do
     
     if [ $? -eq 0 ]; then
         # Generate World File (.pgw) for QGIS
+        # Note: PGW coordinates represent the *center* of the top-left pixel
+        # The top-left pixel of a minetestmapper chunk is at X, Z+HEIGHT-1
+        TOP_Z=$((Z + HEIGHT - 1))
+        
         echo "1.0" > "$TILE_PGW"
         echo "0.0" >> "$TILE_PGW"
         echo "0.0" >> "$TILE_PGW"
         echo "-1.0" >> "$TILE_PGW"
         echo "$X" >> "$TILE_PGW"
-        echo "$TOP" >> "$TILE_PGW"
+        echo "$TOP_Z" >> "$TILE_PGW"
     else
         print_error "Failed to render chunk $X $Z"
     fi
