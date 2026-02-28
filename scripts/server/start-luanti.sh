@@ -382,22 +382,15 @@ if [ -n "$MAP_PORT" ]; then
         exit 1
     }
     
-    # Ensure mapserver mod is enabled in world.mt
-    if ! grep -q "^load_mod_mapserver[ =]*true" "$WORLD_MT"; then
-        print_info "Activating mapserver mod in world.mt..."
-        grep -v "^load_mod_mapserver[ =]" "$WORLD_MT" > "${WORLD_MT}.tmp" && mv "${WORLD_MT}.tmp" "$WORLD_MT"
-        echo "load_mod_mapserver = true" >> "$WORLD_MT"
-    fi
-    
     # Verify services are running
     sleep 2
-    if systemctl is-active --quiet "luanti-mapserver@${WORLD}"; then
+    if systemctl is-active --quiet "luanti-map-render@${WORLD}" && systemctl is-active --quiet "luanti-map-server@${WORLD}"; then
         print_info "Map services started successfully!"
-        print_info "Map will be available at: http://$(hostname -I | awk '{print $1}'):$MAP_PORT/"
-        print_info "QGIS XYZ Tile URL: http://$(hostname -I | awk '{print $1}'):$MAP_PORT/api/map/tiles/{z}/{x}/{y}"
+        print_info "Map will be available at: http://$(hostname -I | awk '{print $1}'):$MAP_PORT/map.png"
     else
         print_warning "Map services may not have started correctly. Check with:"
-        echo "  sudo systemctl status luanti-mapserver@${WORLD}"
+        echo "  sudo systemctl status luanti-map-render@${WORLD}"
+        echo "  sudo systemctl status luanti-map-server@${WORLD}"
     fi
     echo ""
 fi

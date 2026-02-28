@@ -22,7 +22,7 @@ PROJECT_ROOT=$(cat /root/.proj_root)
 source $PROJECT_ROOT/src/lib/common.sh
 
 WORLD="$1"
-INTERVAL="${2:-15}"  # Default 15 seconds
+# Default 15 seconds is no longer needed since we use inotifywait
 if [ -z "$WORLD" ]; then
     print_error "Usage: $0 <world_name> [interval_seconds]"
     exit 1
@@ -36,11 +36,23 @@ if [ ! -f "$RENDER_SCRIPT" ]; then
     exit 1
 fi
 
-print_info "Starting auto-render loop for world: $WORLD (interval: ${INTERVAL}s)"
+WORLD_PATH="$(get_user_home)/snap/luanti/common/.minetest/worlds/$WORLD"
+
+if [ ! -f "$WORLD_PATH/map.sqlite" ]; then
+    print_error "map.sqlite not found at $WORLD_PATH/map.sqlite"
+    exit 1
+fi
+
+print_info "Starting event-driven auto-render loop for world: $WORLD"
 
 while true; do
-    print_info "Starting render..."
+    print_info "Waiting for map.sqlite modifications..."
+    inotifywait -q -e modify "$WORLD_PATH/map.sqlite"
+    
+    # Wait to batch rapid block placements
+    print_info "Database modified! Waiting 5s to batch changes..."
+    sleep 5
+    
+    print_info "Starting incremental render cycle..."
     $RENDER_SCRIPT "$WORLD"
-    print_info "Sleeping ${INTERVAL}s..."
-    sleep "$INTERVAL"
 done
