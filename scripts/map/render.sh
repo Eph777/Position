@@ -91,19 +91,23 @@ for coord in $CHUNKS; do
     
     print_info "Rendering chunk $X,$Z..."
     
-    $MAPPER_EXE --input "$WORLD_PATH" --output "$TILE_IMAGE" --bgcolor "#ffffff" --colors "$COLORS_FILE" $GEOM_ARG
+    # We must ensure the geometry uses explicit math bounds
+    GEOM_X=$X
+    GEOM_Z=$Z
+    
+    $MAPPER_EXE --input "$WORLD_PATH" --output "$TILE_IMAGE" --bgcolor "#ffffff" --colors "$COLORS_FILE" --geometry "${GEOM_X}:${GEOM_Z}+${WIDTH}+${HEIGHT}"
     
     if [ $? -eq 0 ]; then
         # Generate World File (.pgw) for QGIS
         # Note: PGW coordinates represent the *center* of the top-left pixel
         # The top-left pixel of a minetestmapper chunk is at X, Z+HEIGHT-1
-        TOP_Z=$((Z + HEIGHT - 1))
+        TOP_Z=$((GEOM_Z + HEIGHT - 1))
         
         echo "1.0" > "$TILE_PGW"
         echo "0.0" >> "$TILE_PGW"
         echo "0.0" >> "$TILE_PGW"
         echo "-1.0" >> "$TILE_PGW"
-        echo "$X" >> "$TILE_PGW"
+        echo "$GEOM_X" >> "$TILE_PGW"
         echo "$TOP_Z" >> "$TILE_PGW"
     else
         print_error "Failed to render chunk $X $Z"
