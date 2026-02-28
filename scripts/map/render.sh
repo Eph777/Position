@@ -95,7 +95,7 @@ for coord in $CHUNKS; do
     GEOM_X=$X
     GEOM_Z=$Z
     
-    $MAPPER_EXE --input "$WORLD_PATH" --output "$TILE_IMAGE" --bgcolor "#ffffff" --colors "$COLORS_FILE" --geometry "${GEOM_X}:${GEOM_Z}+${WIDTH}+${HEIGHT}"
+    $MAPPER_EXE --input "$WORLD_PATH" --output "$TILE_IMAGE" --bgcolor "#ffffff" --colors "$COLORS_FILE" --exhaustive auto --geometry "${GEOM_X}:${GEOM_Z}+${WIDTH}+${HEIGHT}"
     
     if [ $? -eq 0 ]; then
         # Generate World File (.pgw) for QGIS

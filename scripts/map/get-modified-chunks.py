@@ -70,6 +70,46 @@ for row in rows:
     
     chunks.add((chunk_index_x, chunk_index_z))
 
+# Now also find all chunks that should exist but have no PNG file
+import os
+
+world_path = os.path.dirname(db_path)
+output_dir = os.path.join(world_path, "map_output")
+
+# Query all blocks ever modified to see all valid chunks
+try:
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    if is_xyz:
+        cur.execute("SELECT x, z FROM changed_blocks")
+    else:
+        cur.execute("SELECT pos FROM changed_blocks")
+    all_rows = cur.fetchall()
+    conn.close()
+    
+    for row in all_rows:
+        if is_xyz:
+            x, z = row[0], row[1]
+        else:
+            pos = row[0]
+            u = pos & 0xFFFFFFFFFFFFFFFF
+            x = u & 0xFFF
+            if x >= 0x800: x -= 0x1000
+            z = (u >> 24) & 0xFFF
+            if z >= 0x800: z -= 0x1000
+            
+        node_x = x * MAPBLOCK_NODES
+        node_z = z * MAPBLOCK_NODES
+        cx = node_x // CHUNK_SIZE_NODES
+        cz = node_z // CHUNK_SIZE_NODES
+        
+        # Check if the PNG exists
+        png_path = os.path.join(output_dir, f"chunk_{cx * CHUNK_SIZE_NODES}_{cz * CHUNK_SIZE_NODES}.png")
+        if not os.path.exists(png_path):
+            chunks.add((cx, cz))
+except Exception:
+    pass
+
 # Output the bottom-left corner of each chunk boundary (x,z)
 for cx, cz in chunks:
     print(f"{cx * CHUNK_SIZE_NODES},{cz * CHUNK_SIZE_NODES}")
