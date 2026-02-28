@@ -106,7 +106,7 @@ done
 
 print_info "Building world_map.vrt for QGIS..."
 if command_exists gdalbuildvrt; then
-    gdalbuildvrt -q "$OUTPUT_DIR/world_map.vrt" "$OUTPUT_DIR"/chunk_*.png
+    (cd "$OUTPUT_DIR" && gdalbuildvrt -q "world_map.vrt" chunk_*.png)
     print_info "VRT updated successfully."
 else
     print_warning "gdal-bin is not installed. world_map.vrt was not updated."

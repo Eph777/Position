@@ -77,8 +77,10 @@ class RangeRequestHandler(SimpleHTTPRequestHandler):
             self.send_header("Last-Modified", self.date_time_string(os.path.getmtime(path)))
             self.end_headers() # This calls our overridden end_headers() adding Accept-Ranges
             
-            f.seek(start)
-            self.copyfile_range(f, self.wfile, length)
+            if self.command == 'GET':
+                f.seek(start)
+                self.copyfile_range(f, self.wfile, length)
+            
             f.close()
             return None
             
