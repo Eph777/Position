@@ -56,12 +56,19 @@ for row in rows:
         z = (u >> 24) & 0xFFF
         if z >= 0x800: z -= 0x1000
     
-    # x, z are mapblock coordinates.
-    # To get chunk coordinates: floor((x * MAPBLOCK_NODES) / CHUNK_SIZE_NODES)
-    chunk_x = math.floor((x * MAPBLOCK_NODES) / CHUNK_SIZE_NODES)
-    chunk_z = math.floor((z * MAPBLOCK_NODES) / CHUNK_SIZE_NODES)
+    # x, z are mapblock coordinates (-2048 to +2047 etc). Each mapblock is 16 nodes.
+    # Total node coordinates are x * 16, z * 16.
+    # We want to find which 256x256 chunk this node falls into.
+    # The chunk boundary align grid is: ..., -256, 0, 256, 512, ...
     
-    chunks.add((chunk_x, chunk_z))
+    node_x = x * MAPBLOCK_NODES
+    node_z = z * MAPBLOCK_NODES
+    
+    # Floor division by 256 gives us the chunk grid index
+    chunk_index_x = node_x // CHUNK_SIZE_NODES
+    chunk_index_z = node_z // CHUNK_SIZE_NODES
+    
+    chunks.add((chunk_index_x, chunk_index_z))
 
 # Output the bottom-left corner of each chunk boundary (x,z)
 for cx, cz in chunks:

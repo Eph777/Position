@@ -79,10 +79,11 @@ WIDTH=256
 HEIGHT=256
 
 for coord in $CHUNKS; do
+    # coord is X,Z of the bottom-left corner of the chunk
     X=${coord%,*}
     Z=${coord#*,}
-    TOP=$((Z + HEIGHT))
-    
+    TOP=$((Z + HEIGHT))  # Need this for QGIS pgw!
+
     GEOM_ARG="--geometry $X:$Z+$WIDTH+$HEIGHT"
     TILE_IMAGE="$OUTPUT_DIR/chunk_${X}_${Z}.png"
     TILE_PGW="$OUTPUT_DIR/chunk_${X}_${Z}.pgw"
