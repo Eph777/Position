@@ -35,9 +35,6 @@ MAPPER_EXE="$USER_HOME/minetest-mapper/minetestmapper"
 COLORS_FILE="$USER_HOME/minetest-mapper/colors.txt"
 WORLD_PATH="$USER_HOME/snap/luanti/common/.minetest/worlds/$WORLD"
 OUTPUT_DIR="$WORLD_PATH/map_output"  # Store maps inside world folder
-LAST_RENDER_FILE="$OUTPUT_DIR/last_render_time.txt"
-LAST_RENDER=$(cat "$LAST_RENDER_FILE" 2>/dev/null || echo 0)
-NOW=$(date +%s)
 
 # Ensure output directory exists
 mkdir -p "$OUTPUT_DIR"
@@ -61,8 +58,8 @@ if [ ! -f "$MODIFIED_CHUNKS_SCRIPT" ]; then
     exit 1
 fi
 
-print_info "Querying database for modified chunks since $LAST_RENDER..."
-CHUNKS=$("$MODIFIED_CHUNKS_SCRIPT" "$WORLD_PATH/map.sqlite" "$LAST_RENDER")
+print_info "Querying database for all known chunks..."
+CHUNKS=$("$MODIFIED_CHUNKS_SCRIPT" "$WORLD_PATH/map.sqlite" "0")
 
 if [[ $? -ne 0 ]]; then
     print_error "Failed to query modified chunks."
@@ -123,5 +120,4 @@ else
     print_warning "Install it with: sudo apt-get install gdal-bin"
 fi
 
-echo "$NOW" > "$LAST_RENDER_FILE"
 print_info "Incremental render cycle complete!"

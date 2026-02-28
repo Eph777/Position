@@ -22,11 +22,11 @@ try:
         sys.exit(0)
         
     if 'x' in columns:
-        cur.execute("SELECT x, z FROM changed_blocks WHERE mtime > ?", (last_time,))
+        cur.execute("SELECT x, z FROM changed_blocks")
         rows = cur.fetchall()
         is_xyz = True
     else:
-        cur.execute("SELECT pos FROM changed_blocks WHERE mtime > ?", (last_time,))
+        cur.execute("SELECT pos FROM changed_blocks")
         rows = cur.fetchall()
         is_xyz = False
         

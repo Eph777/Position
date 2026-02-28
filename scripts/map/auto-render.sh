@@ -43,16 +43,13 @@ if [ ! -f "$WORLD_PATH/map.sqlite" ]; then
     exit 1
 fi
 
-print_info "Starting event-driven auto-render loop for world: $WORLD"
+INTERVAL="${2:-5}"
+
+print_info "Starting unconditional auto-render loop for world: $WORLD (every $INTERVAL seconds)"
 
 while true; do
-    print_info "Waiting for map.sqlite modifications..."
-    inotifywait -q -e modify "$WORLD_PATH/map.sqlite"
-    
-    # Wait to batch rapid block placements
-    print_info "Database modified! Waiting 5s to batch changes..."
-    sleep 5
-    
-    print_info "Starting incremental render cycle..."
+    print_info "Starting bulk render cycle..."
     $RENDER_SCRIPT "$WORLD"
+    print_info "Waiting ${INTERVAL}s before next render..."
+    sleep "$INTERVAL"
 done
