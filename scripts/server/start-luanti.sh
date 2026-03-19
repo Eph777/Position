@@ -29,8 +29,8 @@ WORLD=""
 PORT=30000
 IS_SERVICE=false
 MAP_PORT=""
-MAP_INTERVAL="15"
 INTERACTIVE=false
+GAME_ID="minetest_game"
 
 # Parse Positional Arguments
 # Check if current First argument is existent and NOT a flag
@@ -49,13 +49,12 @@ fi
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --help)
-            echo "Usage: $0 [-i|--interactive] <world_name> [port] [--service] [--map MAP_PORT] [--map-refresh INTERVAL]"
+            echo "Usage: $0 [-i|--interactive] <world_name> [port] [--service] [--map MAP_PORT]"
             echo "  -i, --interactive        Run in interactive mode"
             echo "  <world_name>             Name of the world folder (Required unless interactive)"
             echo "  [port]                   UDP Port for game server (Default: 30000)"
             echo "  --service                Create and start as systemd service"
             echo "  --map PORT               Also start map hosting on TCP PORT"
-            echo "  --map-refresh SECONDS    Map render interval (Default: 15s)"
             exit 0
             ;;
         -i|--interactive)
@@ -66,20 +65,20 @@ while [[ $# -gt 0 ]]; do
             IS_SERVICE=true
             shift
             ;;
+        --game)
+            if [[ -z "$2" || "$2" == -* ]]; then
+                echo "Error: --game requires a game ID argument"
+                exit 1
+            fi
+            GAME_ID="$2"
+            shift 2
+            ;;
         --map)
             if [[ -z "$2" || "$2" == -* ]]; then
                 echo "Error: --map requires a port number argument"
                 exit 1
             fi
             MAP_PORT="$2"
-            shift 2
-            ;;
-        --map-refresh)
-            if [[ -z "$2" || "$2" == -* ]]; then
-                echo "Error: --map-refresh requires a seconds argument"
-                exit 1
-            fi
-            MAP_INTERVAL="$2"
             shift 2
             ;;
         *)
@@ -92,6 +91,39 @@ done
 if [[ "$INTERACTIVE" == true ]]; then
     # interactive personalization
     echo "--- Server Configuration ---"
+
+
+    GAMES_DIR="/root/snap/luanti/common/.minetest/games"
+    existing_games=()
+    if [ -d "$GAMES_DIR" ]; then
+        for g in "$GAMES_DIR"/*; do
+            if [ -d "$g" ]; then
+                existing_games+=("$(basename "$g")")
+            fi
+        done
+    fi
+    
+    for i in "${!existing_games[@]}"; do
+        echo "[$((i + 1))] ${existing_games[$i]}"
+    done
+
+
+    while true; do
+        read -p "game choice : " -r G_CHOICE
+        if [[ "$G_CHOICE" =~ ^[0-9]+$ ]]; then
+            
+            G_INDEX=$((G_CHOICE - 1))
+            if [[ "$G_INDEX" -lt 0 ]] || [[ "$G_INDEX" -ge "${#existing_games[@]}" ]]; then
+                print_error "Invalid selection."
+            else
+                GAME_ID="${existing_games[$G_INDEX]}"
+                break
+            fi
+        else
+            print_error "Invalid choice: please enter a number."
+        fi
+    done
+    
 
     WORLDS_DIR="/root/snap/luanti/common/.minetest/worlds"
     existing_worlds=()
@@ -139,11 +171,6 @@ if [[ "$INTERACTIVE" == true ]]; then
     read -p "map hosting port (default: ${MAP_PORT:-none}) : " -r
     if [[ -n "$REPLY" ]]; then MAP_PORT="$REPLY"; fi
 
-    if [[ -n "$MAP_PORT" ]]; then
-        read -p "map refresh interval seconds (default: $MAP_INTERVAL) : " -r
-        if [[ -n "$REPLY" ]]; then MAP_INTERVAL="$REPLY"; fi
-    fi
-
     curr_svc="n"
     if [ "$IS_SERVICE" = true ]; then curr_svc="y"; fi
     read -p "run as systemd service? (y/n) (default: $curr_svc) : " -n 1 -r
@@ -159,12 +186,11 @@ fi
 sudo ufw allow "$PORT/udp"
 
 if [ -z "$WORLD" ]; then
-    print_error "Usage: $0 [-i|--interactive] <world_name> [port] [--service] [--map MAP_PORT] [--map-refresh INTERVAL]"
+    print_error "Usage: $0 [-i|--interactive] <world_name> [port] [--service] [--map MAP_PORT]"
     echo "  With -i, --interactive:  Prompts for configuration interactively"
     echo "  Without --service: Runs in foreground"
     echo "  With --service: Creates and starts systemd service"
-    echo "  With --map PORT: Also starts map rendering and hosting on specified port"
-    echo "  With --map-refresh INTERVAL: Set map refresh interval in seconds"
+    echo "  With --map PORT: Also starts Mapserver hosting on specified port"
     exit 1
 fi
 
@@ -195,7 +221,7 @@ fi
 if [ ! -f "$WORLD_MT" ]; then
     print_info "Creating world.mt configuration file..."
     cat > "$WORLD_MT" <<EOF
-gameid = minetest_game
+gameid = ${GAME_ID}
 backend = sqlite3
 player_backend = sqlite3
 auth_backend = sqlite3
@@ -389,28 +415,31 @@ if [ -n "$MAP_PORT" ]; then
 
     check_port "$MAP_PORT" --kill || exit 1
 
-    print_info "Setting up map rendering and hosting services on port $MAP_PORT..."
-    
-    # Open firewall for map server
-    print_info "Opening firewall port $MAP_PORT/tcp..."
-    sudo ufw allow "$MAP_PORT/tcp"
+    print_info "Setting up Mapserver services on port $MAP_PORT..."
     
     # Run map hosting setup script
-    print_info "Configuring map services..."
-    "$PROJECT_ROOT/scripts/map/setup-hosting.sh" "$WORLD" "$MAP_PORT" "$MAP_INTERVAL" || {
+    print_info "Configuring Mapserver..."
+    "$PROJECT_ROOT/scripts/map/setup-hosting.sh" "$WORLD" "$MAP_PORT" || {
         print_error "Failed to setup map services"
         exit 1
     }
     
+    # Ensure mapserver mod is enabled in world.mt
+    if ! grep -q "^load_mod_mapserver[ =]*true" "$WORLD_MT"; then
+        print_info "Activating mapserver mod in world.mt..."
+        grep -v "^load_mod_mapserver[ =]" "$WORLD_MT" > "${WORLD_MT}.tmp" && mv "${WORLD_MT}.tmp" "$WORLD_MT"
+        echo "load_mod_mapserver = true" >> "$WORLD_MT"
+    fi
+    
     # Verify services are running
     sleep 2
-    if systemctl is-active --quiet "luanti-map-render@${WORLD}" && systemctl is-active --quiet "luanti-map-server@${WORLD}"; then
+    if systemctl is-active --quiet "luanti-mapserver@${WORLD}"; then
         print_info "Map services started successfully!"
-        print_info "Map will be available at: http://$(hostname -I | awk '{print $1}'):$MAP_PORT/map.png"
+        print_info "Map will be available at: http://$(hostname -I | awk '{print $1}'):$MAP_PORT/"
+        print_info "QGIS XYZ Tile URL: http://$(hostname -I | awk '{print $1}'):$MAP_PORT/api/map/tiles/{z}/{x}/{y}"
     else
         print_warning "Map services may not have started correctly. Check with:"
-        echo "  sudo systemctl status luanti-map-render@${WORLD}"
-        echo "  sudo systemctl status luanti-map-server@${WORLD}"
+        echo "  sudo systemctl status luanti-mapserver@${WORLD}"
     fi
     echo ""
 fi
@@ -433,7 +462,7 @@ After=network.target
 Type=simple
 User=${CURRENT_USER}
 WorkingDirectory=${USER_HOME}
-ExecStart=/snap/bin/luanti --server --world ${WORLD_PATH} --gameid minetest_game --port ${PORT}
+ExecStart=/snap/bin/luanti --server --world ${WORLD_PATH} --gameid ${GAME_ID} --port ${PORT}
 Restart=always
 RestartSec=10
 
@@ -479,5 +508,5 @@ else
     print_info "Press Ctrl+C to stop the server"
     echo ""
     
-    /snap/bin/luanti --server --world "$WORLD_PATH" --gameid minetest_game --port "$PORT"
+    /snap/bin/luanti --server --world "$WORLD_PATH" --gameid "$GAME_ID" --port "$PORT"
 fi
