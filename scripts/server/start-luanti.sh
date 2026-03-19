@@ -113,7 +113,7 @@ if [[ "$INTERACTIVE" == true ]]; then
         done
 
         read -p "game choice : " -r G_CHOICE
-        
+
         if [[ "$G_CHOICE" =~ ^[0-9]+$ ]]; then
             if [[ "$G_CHOICE" -eq 0 ]]; then
                 # download a new game
@@ -251,7 +251,6 @@ backend = sqlite3
 player_backend = sqlite3
 auth_backend = sqlite3
 mod_storage_backend = sqlite3
-load_mod_position_tracker = true
 EOF
     print_info "World configuration created."
 else
