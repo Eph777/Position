@@ -30,7 +30,6 @@ PORT=30000
 IS_SERVICE=false
 MAP_PORT=""
 INTERACTIVE=false
-GAME_ID="minetest_game"
 
 # Parse Positional Arguments
 # Check if current First argument is existent and NOT a flag
@@ -65,14 +64,6 @@ while [[ $# -gt 0 ]]; do
             IS_SERVICE=true
             shift
             ;;
-        --game)
-            if [[ -z "$2" || "$2" == -* ]]; then
-                echo "Error: --game requires a game ID argument"
-                exit 1
-            fi
-            GAME_ID="$2"
-            shift 2
-            ;;
         --map)
             if [[ -z "$2" || "$2" == -* ]]; then
                 echo "Error: --map requires a port number argument"
@@ -91,39 +82,6 @@ done
 if [[ "$INTERACTIVE" == true ]]; then
     # interactive personalization
     echo "--- Server Configuration ---"
-
-
-    GAMES_DIR="/root/snap/luanti/common/.minetest/games"
-    existing_games=()
-    if [ -d "$GAMES_DIR" ]; then
-        for g in "$GAMES_DIR"/*; do
-            if [ -d "$g" ]; then
-                existing_games+=("$(basename "$g")")
-            fi
-        done
-    fi
-    
-    for i in "${!existing_games[@]}"; do
-        echo "[$((i + 1))] ${existing_games[$i]}"
-    done
-
-
-    while true; do
-        read -p "game choice : " -r G_CHOICE
-        if [[ "$G_CHOICE" =~ ^[0-9]+$ ]]; then
-            
-            G_INDEX=$((G_CHOICE - 1))
-            if [[ "$G_INDEX" -lt 0 ]] || [[ "$G_INDEX" -ge "${#existing_games[@]}" ]]; then
-                print_error "Invalid selection."
-            else
-                GAME_ID="${existing_games[$G_INDEX]}"
-                break
-            fi
-        else
-            print_error "Invalid choice: please enter a number."
-        fi
-    done
-    
 
     WORLDS_DIR="/root/snap/luanti/common/.minetest/worlds"
     existing_worlds=()
@@ -221,7 +179,7 @@ fi
 if [ ! -f "$WORLD_MT" ]; then
     print_info "Creating world.mt configuration file..."
     cat > "$WORLD_MT" <<EOF
-gameid = ${GAME_ID}
+gameid = minetest_game
 backend = sqlite3
 player_backend = sqlite3
 auth_backend = sqlite3
@@ -462,7 +420,7 @@ After=network.target
 Type=simple
 User=${CURRENT_USER}
 WorkingDirectory=${USER_HOME}
-ExecStart=/snap/bin/luanti --server --world ${WORLD_PATH} --gameid ${GAME_ID} --port ${PORT}
+ExecStart=/snap/bin/luanti --server --world ${WORLD_PATH} --gameid minetest_game --port ${PORT}
 Restart=always
 RestartSec=10
 
@@ -508,5 +466,5 @@ else
     print_info "Press Ctrl+C to stop the server"
     echo ""
     
-    /snap/bin/luanti --server --world "$WORLD_PATH" --gameid "$GAME_ID" --port "$PORT"
+    /snap/bin/luanti --server --world "$WORLD_PATH" --gameid minetest_game --port "$PORT"
 fi
