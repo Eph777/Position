@@ -103,26 +103,51 @@ if [[ "$INTERACTIVE" == true ]]; then
         done
     fi
     
-    for i in "${!existing_games[@]}"; do
-        echo "[$((i + 1))] ${existing_games[$i]}"
-    done
+    
 
 
     while true; do
+        echo "[0] download a new game"
+        for i in "${!existing_games[@]}"; do
+            echo "[$((i + 1))] ${existing_games[$i]}"
+        done
+
         read -p "game choice : " -r G_CHOICE
+        
         if [[ "$G_CHOICE" =~ ^[0-9]+$ ]]; then
-            
-            G_INDEX=$((G_CHOICE - 1))
-            if [[ "$G_INDEX" -lt 0 ]] || [[ "$G_INDEX" -ge "${#existing_games[@]}" ]]; then
-                print_error "Invalid selection."
+            if [[ "$G_CHOICE" -eq 0 ]]; then
+                # download a new game
+                read -p "game download link : " -r G_LINK
+                if [[ -n "$G_LINK" ]]; then
+                    if install_game_from_zip "$G_LINK"; then
+                        existing_games=()
+                        if [ -d "$GAMES_DIR" ]; then
+                            for g in "$GAMES_DIR"/*; do
+                                if [ -d "$g" ]; then
+                                    existing_games+=("$(basename "$g")")
+                                fi
+                            done
+                        fi
+                    fi
+                else
+                    print_error "Link cannot be empty."
+                fi
             else
-                GAME_ID="${existing_games[$G_INDEX]}"
-                break
+
+                G_INDEX=$((G_CHOICE - 1))
+                if [[ "$G_INDEX" -lt 0 ]] || [[ "$G_INDEX" -ge "${#existing_games[@]}" ]]; then
+                    print_error "Invalid selection."
+                else
+                    GAME_ID="${existing_games[$G_INDEX]}"
+                    break
+                fi
             fi
         else
             print_error "Invalid choice: please enter a number."
         fi
     done
+
+    
     
 
     WORLDS_DIR="/root/snap/luanti/common/.minetest/worlds"

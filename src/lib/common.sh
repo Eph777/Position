@@ -194,6 +194,69 @@ update_config_value() {
     fi
 }
 
+# Download and install a game from a zip URL
+# Usage: install_game_from_zip <url>
+install_game_from_zip() {
+    local url="$1"
+    if [ -z "$url" ]; then
+        print_error "No URL provided."
+        return 1
+    fi
+    
+    local user_home=$(get_user_home)
+    local games_dir="$user_home/snap/luanti/common/.minetest/games"
+    
+    if [ ! -d "$games_dir" ]; then
+        mkdir -p "$games_dir"
+    fi
+    
+    local temp_zip=$(mktemp)
+    print_info "Downloading game from URL..."
+    
+    if curl -sL "$url" -o "$temp_zip"; then
+        local extract_dir=$(mktemp -d)
+        if unzip -q "$temp_zip" -d "$extract_dir"; then
+            # Find the actual game directory inside (often nested)
+            local game_root_dir=$(find "$extract_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+            
+            if [ -n "$game_root_dir" ]; then
+                local game_name=$(basename "$game_root_dir")
+                
+                # Remove trailing -master or version tags commonly found in downloaded zips
+                local clean_game_name=$(echo "$game_name" | sed -E 's/-[0-9a-fA-F]+$|-master$//')
+                
+                local target_game_dir="$games_dir/$clean_game_name"
+                
+                if [ -d "$target_game_dir" ]; then
+                    print_warning "Game directory '$clean_game_name' already exists. Overwriting..."
+                    rm -rf "$target_game_dir"
+                fi
+                
+                mv "$game_root_dir" "$target_game_dir"
+                print_info "Installed game to $target_game_dir"
+            else
+                print_error "Could not find a valid game directory in the downloaded zip."
+                rm -rf "$extract_dir"
+                rm -f "$temp_zip"
+                return 1
+            fi
+        else
+            print_error "Failed to extract the game zip."
+            rm -rf "$extract_dir"
+            rm -f "$temp_zip"
+            return 1
+        fi
+        rm -rf "$extract_dir"
+    else
+        print_error "Failed to download the game."
+        rm -f "$temp_zip"
+        return 1
+    fi
+    
+    rm -f "$temp_zip"
+    return 0
+}
+
 # Export all functions for use in other scripts
 export -f print_info
 export -f print_error
@@ -207,3 +270,5 @@ export -f load_env
 export -f command_exists
 export -f confirm
 export -f update_config_value
+export -f install_game_from_zip
+
