@@ -8,20 +8,16 @@ from qgis.core import QgsRasterLayer, QgsProject, QgsCoordinateReferenceSystem
 # =========================================================
 
 # 1. Configuration
-# Replace with the actual IP address or domain of your Linux Mapserver!
-SERVER_IP = "127.0.0.1" 
-SERVER_PORT = "8080"
-
-# The mapserver tile endpoint is /api/tile/{layer}/{x}/{y}/{zoom}
-# '1' is typically the Base Map in Luanti Mapserver.
-LAYER_ID = "1"
+# We now point QGIS to the LOCAL PYTHON PROXY running on your Mac.
+# The Proxy handles the messy translation of web mercator Slippy tiles to Mapserver Coordinates.
+PROXY_URL = "http://127.0.0.1:5000/tiles/{z}/{x}/{y}"
 
 # Adjust minimum and maximum zoom depending on your world's size in mapserver.json
 Z_MIN = 1
 Z_MAX = 13 
 
 # 2. Build the exact XYZ parameters string required by QgsRasterLayer
-url_template = f"http://{SERVER_IP}:{SERVER_PORT}/api/tile/{LAYER_ID}/{{x}}/{{y}}/{{z}}"
+url_template = PROXY_URL
 
 params = {
     'type': 'xyz',
