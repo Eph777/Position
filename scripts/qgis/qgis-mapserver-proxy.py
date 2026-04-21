@@ -24,7 +24,7 @@ s.connect(("8.8.8.8", 80))
 IP_ADDRESS = s.getsockname()[0]
 s.close()
 # Set this to the exact IP/Port of your Luanti server
-MAPSERVER_URL = f"http://{IP_ADDRESS}"
+MAPSERVER_URL = f"http://{IP_ADDRESS}:8080"
 LAYER_ID = 1
 
 # If the map renders perfectly but is upside-down (north is south),
@@ -57,6 +57,8 @@ class MapserverProxyHandler(http.server.SimpleHTTPRequestHandler):
             # Build the official Mapserver request
             target_url = f"{MAPSERVER_URL}/api/tile/{LAYER_ID}/{x_ms}/{y_ms}/{z}"
             
+            print(f"[Proxy] QGIS requests Z:{z} X:{x_qgis} Y:{y_qgis} -> Mapserver {x_ms}/{y_ms}")
+            
             try:
                 # Fetch the tile from your Linux server
                 req = urllib.request.Request(target_url, headers={'User-Agent': 'QGIS-Proxy'})
@@ -72,6 +74,7 @@ class MapserverProxyHandler(http.server.SimpleHTTPRequestHandler):
                 # If mapserver returns 404 (chunk doesn't exist), just silently pass it to QGIS
                 self.send_response(e.code)
                 self.end_headers()
+                print(f"        -> Mapserver returned 404 Empty")
             except Exception as e:
                 print(f"[!] Target URL failed: {target_url} - {str(e)}")
                 self.send_response(500)

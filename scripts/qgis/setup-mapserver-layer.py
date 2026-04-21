@@ -10,7 +10,7 @@ from qgis.core import QgsRasterLayer, QgsProject, QgsCoordinateReferenceSystem
 # 1. Configuration
 # We now point QGIS to the LOCAL PYTHON PROXY running on your Mac.
 # The Proxy handles the messy translation of web mercator Slippy tiles to Mapserver Coordinates.
-PROXY_URL = "http://127.0.0.1:5000/tiles/{z}/{x}/{y}"
+PROXY_URL = "http://192.168.2.14:5050/tiles/{z}/{x}/{y}"
 
 # Adjust minimum and maximum zoom depending on your world's size in mapserver.json
 Z_MIN = 1
