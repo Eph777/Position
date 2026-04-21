@@ -69,15 +69,15 @@ User=${SERVICE_USER}
 WorkingDirectory=$WORLD_PATH
 Environment="MAPSERVER_PORT=${MAP_PORT}"
 # By running mapserver inside the world directory, it auto-detects world.mt
-ExecStart=$MAPSERVER_BIN -port ${MAP_PORT}
+ExecStartPre=/usr/bin/python3 -c "import json, os; f='mapserver.json'; d = json.load(open(f)) if os.path.exists(f) else {}; d['port'] = int('${MAP_PORT}'); json.dump(d, open(f, 'w'), indent=4)"
+ExecStart=$MAPSERVER_BIN
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# Note: We configure the port directly via command line arg to the mapserver,
-# but it also respects environment or mapserver.json config.
+# Note: We configure the port directly into mapserver.json via the ExecStartPre Python hook.
 
 # Open Firewall Port
 print_info "Opening port ${MAP_PORT}..."
