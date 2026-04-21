@@ -4,7 +4,6 @@ import socketserver
 import urllib.request
 import urllib.error
 import re
-import socket
 import sys
 
 # =========================================================
@@ -13,21 +12,9 @@ import sys
 
 PROXY_PORT = 5050
 
-# Automatically detect system's LAN IP
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-try:
-    s.connect(("8.8.8.8", 80))
-    IP_ADDRESS = s.getsockname()[0]
-except Exception:
-    IP_ADDRESS = "127.0.0.1"
-finally:
-    s.close()
-
-# The Fuzzer proved Mapserver uses Layer 0 and port 8080!
-MAPSERVER_URL = f"http://{IP_ADDRESS}:8080"
+# Mapserver operates on the user's localhost via SSH tunnel!
+MAPSERVER_URL = "http://127.0.0.1:8080"
 LAYER_ID = 0
-
-# Set to True to inverse the Y-axis if the map is upside-down.
 INVERT_Y = False
 
 class MapserverProxyHandler(http.server.SimpleHTTPRequestHandler):
@@ -40,13 +27,9 @@ class MapserverProxyHandler(http.server.SimpleHTTPRequestHandler):
 
             tile_center = 2 ** (z - 1)
             x_ms = x_qgis - tile_center
-            
-            if INVERT_Y:
-                y_ms = tile_center - y_qgis 
-            else:
-                y_ms = y_qgis - tile_center
+            y_ms = tile_center - y_qgis if INVERT_Y else y_qgis - tile_center
 
-            # The proven API format!
+            # The exact API endpoint
             target_url = f"{MAPSERVER_URL}/api/tile/{LAYER_ID}/{x_ms}/{y_ms}/{z}"
             
             try:
@@ -57,13 +40,10 @@ class MapserverProxyHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_header('Access-Control-Allow-Origin', '*')
                     self.end_headers()
                     self.wfile.write(response.read())
-            
             except urllib.error.HTTPError as e:
-                # 404 means chunk doesn't exist, ignore cleanly
                 self.send_response(e.code)
                 self.end_headers()
             except Exception as e:
-                print(f"[!] Mapserver target URL failed: {target_url} - {str(e)}")
                 self.send_response(500)
                 self.end_headers()
         else:
@@ -77,12 +57,12 @@ if __name__ == "__main__":
     print(f"===========================================================")
     print(f"      Luanti QGIS Tile Proxy Server Initiated              ")
     print(f"===========================================================")
-    print(f" Proxy Address:  http://{IP_ADDRESS}:{PROXY_PORT}/")
+    print(f" Proxy Address:  http://127.0.0.1:{PROXY_PORT}/")
     print(f" Target Server:  {MAPSERVER_URL}")
     print(f" Target Layer:   {LAYER_ID}")
     print(f"===========================================================")
     
-    with socketserver.ThreadingTCPServer(("0.0.0.0", PROXY_PORT), MapserverProxyHandler) as httpd:
+    with socketserver.ThreadingTCPServer(("127.0.0.1", PROXY_PORT), MapserverProxyHandler) as httpd:
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

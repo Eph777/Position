@@ -1,23 +1,14 @@
 import urllib.parse
-import socket
-from qgis.core import QgsRasterLayer, QgsProject, QgsCoordinateReferenceSystem
+from qgis.core import QgsRasterLayer, QgsProject, QgsCoordinateReferenceSystem, QgsRectangle
+from qgis.utils import iface
 
 # =========================================================
 # LUANTI MAPSERVER QGIS INTEGRATION SCRIPT
 # Copy and paste this script directly into the QGIS Python Console
 # =========================================================
 
-# Dynamically lookup IP so the user doesn't have to change it!
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-try:
-    s.connect(("8.8.8.8", 80))
-    IP_ADDRESS = s.getsockname()[0]
-except Exception:
-    IP_ADDRESS = "127.0.0.1"
-finally:
-    s.close()
-
-PROXY_URL = f"http://{IP_ADDRESS}:5050/tiles/{{z}}/{{x}}/{{y}}"
+# The Proxy listens on localhost (127.0.0.1) on port 5050
+PROXY_URL = "http://127.0.0.1:5050/tiles/{z}/{x}/{y}"
 
 Z_MIN = 1
 Z_MAX = 13 
@@ -39,5 +30,15 @@ layer.setCrs(crs)
 if layer.isValid():
     QgsProject.instance().addMapLayer(layer)
     print(f"Success! Proxy mapped to ({PROXY_URL})")
+    
+    # MAGIC FIX: Snap QGIS Camera exactly to the Equator (0,0) where the map lives!
+    # Because XYZ maps cover the whole Earth, if you aren't at the exact center, everything is blank!
+    if iface:
+        canvas = iface.mapCanvas()
+        # Create a tiny bounding box at point (0,0) exactly
+        extent = QgsRectangle(-15000, -15000, 15000, 15000)
+        canvas.setExtent(extent)
+        canvas.refresh()
+        print("-> Camera snapped directly to your Game World!")
 else:
     print("Error: QGIS failed to validate the layer.")
