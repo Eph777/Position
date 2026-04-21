@@ -51,8 +51,14 @@ if [ ! -f "$MAPSERVER_BIN" ]; then
     exit 1
 fi
 
+WORLD_MAPSERVER_BIN="$WORLD_PATH/mapserver_$WORLD"
+
+# Copy binary to world folder
+print_info "Copying Mapserver binary to world folder..."
+cp "$MAPSERVER_BIN" "$WORLD_MAPSERVER_BIN"
+
 # Make binary executable
-chmod +x "$MAPSERVER_BIN"
+chmod +x "$WORLD_MAPSERVER_BIN"
 
 print_info "Setting up real-time Go Mapserver service..."
 
@@ -70,7 +76,7 @@ WorkingDirectory=$WORLD_PATH
 Environment="MAPSERVER_PORT=${MAP_PORT}"
 # By running mapserver inside the world directory, it auto-detects world.mt
 ExecStartPre=/usr/bin/python3 -c "import json, os; f='mapserver.json'; d = json.load(open(f)) if os.path.exists(f) else {}; d['port'] = int('${MAP_PORT}'); json.dump(d, open(f, 'w'), indent=4)"
-ExecStart=$MAPSERVER_BIN
+ExecStart=$WORLD_MAPSERVER_BIN
 Restart=always
 
 [Install]
