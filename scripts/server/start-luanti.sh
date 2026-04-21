@@ -345,7 +345,13 @@ if [[ "$INTERACTIVE" == true ]]; then
             DOWNLOAD_SUCCESS=true
         else
             MOD_INDEX=$((CHOICE - 1 - zip_count))
-            SELECTED_MOD="${installed_mods[$MOD_INDEX]}"
+            SELECTED_MOD_DIR="${installed_mods[$MOD_INDEX]}"
+            
+            if [ -f "$MODS_DIR/$SELECTED_MOD_DIR/mod.conf" ] && grep -q -E "^[[:space:]]*name[[:space:]]*=" "$MODS_DIR/$SELECTED_MOD_DIR/mod.conf"; then
+                SELECTED_MOD=$(grep -E "^[[:space:]]*name[[:space:]]*=" "$MODS_DIR/$SELECTED_MOD_DIR/mod.conf" | cut -d'=' -f2 | tr -d "[:space:]\"'" | head -n 1)
+            else
+                SELECTED_MOD="$SELECTED_MOD_DIR"
+            fi
             
             if grep -q "^load_mod_${SELECTED_MOD}[ =]" "$WORLD_MT"; then
                 read -p "Mod '$SELECTED_MOD' is already configured in world.mt. Overwrite and activate? (y/n) " -n 1 -r
@@ -361,8 +367,8 @@ if [[ "$INTERACTIVE" == true ]]; then
             echo "load_mod_${SELECTED_MOD} = true" >> "$WORLD_MT"
             print_info "Activated installed mod '$SELECTED_MOD' in world.mt"
             
-            if [ -f "$MODS_DIR/$SELECTED_MOD/mod.conf" ]; then
-                DEPENDS=$(grep -i -E '^[ \t]*depends[ \t]*=' "$MODS_DIR/$SELECTED_MOD/mod.conf" | cut -d'=' -f2- | xargs)
+            if [ -f "$MODS_DIR/$SELECTED_MOD_DIR/mod.conf" ]; then
+                DEPENDS=$(grep -i -E '^[ \t]*depends[ \t]*=' "$MODS_DIR/$SELECTED_MOD_DIR/mod.conf" | cut -d'=' -f2- | xargs)
                 if [ -n "$DEPENDS" ]; then
                     print_warning "This mod depends on other mods: $DEPENDS"
                     print_warning "Please ensure they are installed before starting the server."
@@ -394,15 +400,20 @@ if [[ "$INTERACTIVE" == true ]]; then
             fi
             
             if [[ -n "$MOD_ROOT_DIR" ]]; then
-                if [[ "$IS_GIT" == true ]]; then
-                    rm -rf "$MOD_ROOT_DIR/.git"
-                    MOD_NAME=$(basename -s .git "$MOD_INPUT")
+                # Search for mod.conf to get the real name
+                if [ -f "$MOD_ROOT_DIR/mod.conf" ] && grep -q -E "^[[:space:]]*name[[:space:]]*=" "$MOD_ROOT_DIR/mod.conf"; then
+                    CLEAN_MOD_NAME=$(grep -E "^[[:space:]]*name[[:space:]]*=" "$MOD_ROOT_DIR/mod.conf" | cut -d'=' -f2 | tr -d "[:space:]\"'" | head -n 1)
                 else
-                    MOD_NAME=$(basename "$MOD_ROOT_DIR")
+                    if [[ "$IS_GIT" == true ]]; then
+                        rm -rf "$MOD_ROOT_DIR/.git"
+                        MOD_NAME=$(basename -s .git "$MOD_INPUT")
+                    else
+                        MOD_NAME=$(basename "$MOD_ROOT_DIR")
+                    fi
+                    
+                    # Remove trailing -master or version tags commonly found in downloaded zips
+                    CLEAN_MOD_NAME=$(echo "$MOD_NAME" | sed -E 's/-[0-9a-fA-F]+$|-master$//')
                 fi
-                
-                # Remove trailing -master or version tags commonly found in downloaded zips
-                CLEAN_MOD_NAME=$(echo "$MOD_NAME" | sed -E 's/-[0-9a-fA-F]+$|-master$//')
                 
                 TARGET_MOD_DIR="$MODS_DIR/$CLEAN_MOD_NAME"
                 
