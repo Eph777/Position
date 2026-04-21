@@ -460,7 +460,7 @@ if [ -n "$MAP_PORT" ]; then
     if systemctl is-active --quiet "luanti-mapserver@${WORLD}"; then
         print_info "Map services started successfully!"
         print_info "Map will be available at: http://$(hostname -I | awk '{print $1}'):$MAP_PORT/"
-        print_info "QGIS XYZ Tile URL: http://$(hostname -I | awk '{print $1}'):$MAP_PORT/api/map/tiles/{z}/{x}/{y}"
+        print_info "QGIS XYZ Tile URL: http://$(hostname -I | awk '{print $1}'):$MAP_PORT/api/tile/1/{x}/{y}/{z}"
     else
         print_warning "Map services may not have started correctly. Check with:"
         echo "  sudo systemctl status luanti-mapserver@${WORLD}"
