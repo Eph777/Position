@@ -7,16 +7,15 @@ from qgis.utils import iface
 # Execute this inside the QGIS Python Console
 # =========================================================
 
-# The Multipass VM IP. Change this if your VM has a different address.
+# The Multipass VM IP
 VM_IP = "192.168.2.14"
 TILE_PORT = 8080
 
 TILE_URL = f"http://{VM_IP}:{TILE_PORT}/{{z}}/{{x}}/{{y}}.png"
 
-# These should match what the daemon generates. 
-# The daemon writes metadata.txt with the actual max_zoom.
-Z_MIN = 0
-Z_MAX = 8  # Will work even if the daemon uses a different max - QGIS just won't find tiles at unused levels
+# Zoom range: tiles go from zoom 5 (overview) to 13 (full detail, 1px=1node)
+Z_MIN = 5
+Z_MAX = 13
 
 params = {
     'type': 'xyz',
@@ -39,11 +38,15 @@ if layer.isValid():
     
     if iface:
         canvas = iface.mapCanvas()
-        # Snap to a reasonable view around the origin
-        extent = QgsRectangle(-5000, -5000, 5000, 5000)
+        # Game (0,0) maps to EPSG:3857 (0,0) which is lat=0 lon=0.
+        # Snap camera to a small area around the origin.
+        # At zoom 13, one tile = ~4891 meters in EPSG:3857.
+        # Our game world is ~512 nodes = ~2 tiles = ~10000 meters.
+        extent = QgsRectangle(-20000, -20000, 20000, 20000)
         canvas.setExtent(extent)
         canvas.refresh()
-        print("Camera snapped to origin.")
+        print("Camera snapped to equator/meridian (game origin).")
+        print("If you see nothing, try zooming in/out with the scroll wheel.")
 else:
-    print(f"ERROR: Layer failed to validate. URL: {TILE_URL}")
-    print("Check that serve-tiles.py is running on the VM and the port is accessible.")
+    print(f"ERROR: Layer is invalid. URL: {TILE_URL}")
+    print("Check that serve-tiles.py is running on the VM.")

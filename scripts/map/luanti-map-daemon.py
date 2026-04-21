@@ -12,11 +12,8 @@ Luanti Incremental Map Tile Daemon
 Renders the full Minetest world map using minetestmapper (proven to work),
 then slices it into standard Z/X/Y.png tiles for QGIS consumption.
 
-Architecture:
-  1. Call minetestmapper ONCE to render the entire explored map
-  2. Slice the resulting PNG into 256x256 tiles
-  3. Build a zoom pyramid by downscaling
-  4. Repeat every N seconds (daemon mode)
+Uses standard Slippy Map tile numbering at zoom 13 (8192x8192 grid).
+Game coordinate (0,0) maps to tile (4096, 4096) = lat 0, lon 0.
 """
 
 import os
@@ -29,16 +26,23 @@ import math
 from pathlib import Path
 
 TILE_SIZE = 256
+MAX_ZOOM = 13
+CENTER = 2 ** (MAX_ZOOM - 1)  # 4096 — the equator/prime meridian tile
+
+HAS_PIL = False
+try:
+    from PIL import Image
+    HAS_PIL = True
+except ImportError:
+    print("WARNING: python3-pil / Pillow not found.")
+    print("  Fix: sudo apt install python3-pil  OR  pip3 install Pillow")
+
 
 # ---------------------------------------------------------------------------
 # Step 1: Render full map using minetestmapper (the PROVEN working method)
 # ---------------------------------------------------------------------------
 def render_full_map(mapper_exe, world_path, colors_file, output_png):
-    """
-    Calls minetestmapper exactly like render.sh does.
-    Returns (left, top, width, height) of the rendered area, or None on failure.
-    """
-    # First get extent
+    """Calls minetestmapper exactly like render.sh does."""
     extent_cmd = [mapper_exe, "--extent", "--input", world_path, "--colors", colors_file]
     print(f"[1/3] Getting world extent...")
     print(f"  CMD: {' '.join(extent_cmd)}")
@@ -49,7 +53,7 @@ def render_full_map(mapper_exe, world_path, colors_file, output_png):
 
     m = re.search(r"([-0-9]+):([-0-9]+)\+([0-9]+)\+([0-9]+)", combined)
     if not m:
-        print(f"  ERROR: Could not parse extent from output!")
+        print(f"  ERROR: Could not parse extent!")
         return None
 
     left = int(m.group(1))
@@ -58,9 +62,8 @@ def render_full_map(mapper_exe, world_path, colors_file, output_png):
     height = int(m.group(4))
     top = bottom + height
 
-    print(f"  Extent: left={left}, bottom={bottom}, width={width}, height={height}")
+    print(f"  Extent: left={left}, bottom={bottom}, width={width}, height={height}, top={top}")
 
-    # Now render the map
     geom = f"{left}:{bottom}+{width}+{height}"
     render_cmd = [
         mapper_exe,
@@ -75,138 +78,104 @@ def render_full_map(mapper_exe, world_path, colors_file, output_png):
 
     result = subprocess.run(render_cmd, capture_output=True, text=True)
     if result.stdout.strip():
-        print(f"  stdout: {result.stdout.strip()}")
+        print(f"  stdout: {result.stdout.strip()[:200]}")
     if result.stderr.strip():
-        print(f"  stderr: {result.stderr.strip()}")
+        print(f"  stderr: {result.stderr.strip()[:200]}")
 
     if not os.path.exists(output_png):
         print(f"  ERROR: Output file was not created!")
         return None
 
     size = os.path.getsize(output_png)
-    print(f"  Success! Output: {output_png} ({size} bytes)")
+    print(f"  Success! {output_png} ({size} bytes)")
     return left, top, width, height
 
 
 # ---------------------------------------------------------------------------
-# Step 2: Slice the full map PNG into Z/X/Y tiles
+# Step 2: Slice into standard Slippy Map tiles at zoom 13
 # ---------------------------------------------------------------------------
 def slice_into_tiles(full_png, output_dir, left, top, width, height):
     """
-    Slices a full map PNG into 256x256 tile grid.
+    Slices the full map PNG into 256x256 tiles using standard Slippy Map
+    tile numbering at zoom 13.
     
-    Coordinate mapping:
-      - minetestmapper outputs 1 pixel per game node
-      - Tile (0,0) at any zoom = top-left of the rendered image
-      - We use a simple offset scheme: game coord (0,0) sits at the pixel
-        offset (-left, top) within the image, since the image starts at (left, top-height).
+    At zoom 13, there are 8192 tiles per axis (0..8191).
+    Game coordinate (0,0) is placed at tile (4096, 4096) — which corresponds
+    to lat=0, lon=0 (equator / prime meridian) in Web Mercator.
     
-    For QGIS we use a custom flat CRS where tile coordinates directly
-    map to game node positions. No Web Mercator needed.
+    QGIS XYZ tiles follow this exact convention, so tiles will display correctly.
     """
-    try:
-        from PIL import Image
-    except ImportError:
-        print("  ERROR: python3-pil / Pillow not installed! Cannot slice tiles.")
-        print("  Fix: sudo apt install python3-pil  OR  pip3 install Pillow")
+    if not HAS_PIL:
+        print("  ERROR: Pillow not installed! Cannot slice tiles.")
         return 0
 
-    print(f"[3/3] Slicing into {TILE_SIZE}x{TILE_SIZE} tiles...")
+    print(f"[3/3] Slicing into {TILE_SIZE}x{TILE_SIZE} tiles at zoom {MAX_ZOOM}...")
     img = Image.open(full_png)
     img_w, img_h = img.size
-    print(f"  Image dimensions: {img_w}x{img_h} pixels")
+    print(f"  Image: {img_w}x{img_h} px")
+    print(f"  World: left={left}, top={top}, w={width}, h={height}")
 
-    # Calculate how many tiles we need
-    cols = math.ceil(img_w / TILE_SIZE)
-    rows = math.ceil(img_h / TILE_SIZE)
-    print(f"  Grid: {cols} columns x {rows} rows = {cols * rows} potential tiles")
+    # The image's top-left pixel represents game coordinate (left, top-1).
+    # minetestmapper: X increases right, Y(game Z) increases upward.
+    # Image: X increases right, Y increases downward.
+    #
+    # Mapping game coords to tile coords at zoom 13:
+    #   tile_x = CENTER + floor(game_x / TILE_SIZE)
+    #   tile_y = CENTER - floor(game_z / TILE_SIZE) - 1
+    # (Y flipped: tile Y goes down, game Z goes up)
 
-    # We'll generate zoom level 0 as the "native" resolution (1px = 1 node)
-    # Then build a pyramid of lower zooms by downscaling
-    
-    # Determine the maximum zoom where we have full resolution
-    max_zoom = max(math.ceil(math.log2(max(cols, rows, 1))), 1)
-    print(f"  Max zoom level: {max_zoom}")
-
-    # At max_zoom, total grid is 2^max_zoom tiles
-    grid_size = 2 ** max_zoom
-
-    # Place the game world so that game coordinate (0,0) maps to 
-    # tile grid center. The image's top-left pixel represents game 
-    # coordinate (left, top).
-    # Pixel offset of game (0,0) within the image:
-    origin_px_x = -left  # game x=0 is at pixel -left
-    origin_px_y = top - 1  # game z=0 is at pixel (top - 1) because Y flips (top of image = max game Z)
-
-    # Tile index of game (0,0): place it at center of grid
-    center_tile_x = grid_size // 2
-    center_tile_y = grid_size // 2
-
-    # The image top-left pixel starts at this tile offset:
-    img_start_tile_x = center_tile_x - (origin_px_x // TILE_SIZE)
-    img_start_tile_y = center_tile_y - (origin_px_y // TILE_SIZE)
-
-    # Fine pixel offset within the starting tile
-    px_offset_x = origin_px_x % TILE_SIZE
-    px_offset_y = origin_px_y % TILE_SIZE
+    # For each tile-sized chunk of the image, calculate its tile coordinate
+    cols = math.ceil(img_w / TILE_SIZE) + 1
+    rows = math.ceil(img_h / TILE_SIZE) + 1
 
     tiles_written = 0
-    zoom_dir = Path(output_dir) / str(max_zoom)
+    zoom_dir = Path(output_dir) / str(MAX_ZOOM)
+    max_coord = 2 ** MAX_ZOOM  # 8192
 
-    for row in range(rows + 1):
-        for col in range(cols + 1):
-            # Source pixel region from the full image
-            src_x = col * TILE_SIZE - px_offset_x
-            src_y = row * TILE_SIZE - px_offset_y
+    for row in range(rows):
+        for col in range(cols):
+            # Which game coordinates does this image region cover?
+            # Image pixel (col*256, row*256) = game coord (left + col*256, top - 1 - row*256)
+            game_x = left + col * TILE_SIZE
+            game_z = (top - 1) - row * TILE_SIZE
 
-            # Skip if completely outside the image
-            if src_x + TILE_SIZE <= 0 or src_x >= img_w:
+            # Convert to tile coordinates
+            tx = CENTER + math.floor(game_x / TILE_SIZE)
+            ty = CENTER - math.floor(game_z / TILE_SIZE) - 1
+
+            # Validate range
+            if tx < 0 or tx >= max_coord or ty < 0 or ty >= max_coord:
                 continue
-            if src_y + TILE_SIZE <= 0 or src_y >= img_h:
+
+            # Extract the image region
+            src_x = col * TILE_SIZE
+            src_y = row * TILE_SIZE
+
+            if src_x >= img_w or src_y >= img_h:
                 continue
 
-            # Crop the tile (PIL handles out-of-bounds by filling with black)
             tile_img = Image.new("RGB", (TILE_SIZE, TILE_SIZE), (0, 0, 0))
-            
-            # Calculate paste region
-            paste_x = max(0, -src_x)
-            paste_y = max(0, -src_y)
-            crop_x = max(0, src_x)
-            crop_y = max(0, src_y)
             crop_x2 = min(img_w, src_x + TILE_SIZE)
             crop_y2 = min(img_h, src_y + TILE_SIZE)
+            region = img.crop((src_x, src_y, crop_x2, crop_y2))
+            tile_img.paste(region, (0, 0))
 
-            if crop_x2 <= crop_x or crop_y2 <= crop_y:
-                continue
-
-            region = img.crop((crop_x, crop_y, crop_x2, crop_y2))
-            tile_img.paste(region, (paste_x, paste_y))
-
-            # Check if tile is entirely black (empty)
+            # Skip entirely black tiles
             extrema = tile_img.getextrema()
             if all(ch[1] == 0 for ch in extrema):
-                continue  # Skip empty tiles
-
-            # Output tile coordinates
-            tx = img_start_tile_x + col
-            ty = img_start_tile_y + row
+                continue
 
             tile_dir = zoom_dir / str(tx)
             tile_dir.mkdir(parents=True, exist_ok=True)
-            tile_path = tile_dir / f"{ty}.png"
-            tile_img.save(tile_path, "PNG")
+            tile_img.save(tile_dir / f"{ty}.png", "PNG")
             tiles_written += 1
 
-    print(f"  Wrote {tiles_written} tiles at zoom {max_zoom}")
+    print(f"  Wrote {tiles_written} tiles at zoom {MAX_ZOOM}")
     img.close()
 
     # Build zoom pyramid
     if tiles_written > 0:
-        build_zoom_pyramid(output_dir, max_zoom)
-
-    # Write metadata for QGIS setup script to read
-    meta_path = Path(output_dir) / "metadata.txt"
-    meta_path.write_text(f"max_zoom={max_zoom}\ngrid_size={grid_size}\n")
+        build_zoom_pyramid(output_dir, MAX_ZOOM)
 
     return tiles_written
 
@@ -214,16 +183,15 @@ def slice_into_tiles(full_png, output_dir, left, top, width, height):
 # ---------------------------------------------------------------------------
 # Step 3: Build zoom pyramid by downscaling
 # ---------------------------------------------------------------------------
-def build_zoom_pyramid(output_dir, max_zoom):
+def build_zoom_pyramid(output_dir, from_zoom):
     """Builds lower zoom levels by merging 2x2 groups of higher-zoom tiles."""
-    try:
-        from PIL import Image
-    except ImportError:
+    if not HAS_PIL:
         return
 
-    min_zoom = max(0, max_zoom - 6)  # Don't go below 6 levels of zoom out
+    # Build down to zoom 6 (enough for overview)
+    min_zoom = max(0, from_zoom - 8)
 
-    for z in range(max_zoom - 1, min_zoom - 1, -1):
+    for z in range(from_zoom - 1, min_zoom - 1, -1):
         z_high = z + 1
         high_dir = Path(output_dir) / str(z_high)
         z_dir = Path(output_dir) / str(z)
@@ -268,36 +236,42 @@ def build_zoom_pyramid(output_dir, max_zoom):
 
 
 # ---------------------------------------------------------------------------
-# Main loop
+# Main
 # ---------------------------------------------------------------------------
 def run_once(mapper_exe, world_path, colors_file, output_dir):
     """Single render + slice cycle."""
     full_png = os.path.join(output_dir, "_fullmap.png")
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
+    # Clean old tiles first
+    for z_dir in Path(output_dir).iterdir():
+        if z_dir.is_dir() and z_dir.name.isdigit():
+            import shutil
+            shutil.rmtree(z_dir)
+
     result = render_full_map(mapper_exe, world_path, colors_file, full_png)
     if result is None:
-        print("FAILED: Could not render full map. Check minetestmapper output above.")
+        print("FAILED: Could not render full map.")
         return False
 
     left, top, width, height = result
     tiles = slice_into_tiles(full_png, output_dir, left, top, width, height)
-    print(f"Cycle complete. {tiles} tiles generated/updated.")
+    print(f"\nCycle complete. {tiles} tiles generated.")
     return tiles > 0
 
 
 def run_daemon(mapper_exe, world_path, colors_file, output_dir, interval=30):
     """Continuous rendering loop."""
     print("=" * 60)
-    print("  Luanti Map Tile Daemon - Starting")
-    print(f"  World:  {world_path}")
-    print(f"  Output: {output_dir}")
+    print("  Luanti Map Tile Daemon")
+    print(f"  World:    {world_path}")
+    print(f"  Output:   {output_dir}")
     print(f"  Interval: {interval}s")
+    print(f"  Zoom:     {MAX_ZOOM} (center tile: {CENTER},{CENTER})")
     print("=" * 60)
 
     while True:
         try:
-            print(f"\n{'='*40} CYCLE START {'='*40}")
             run_once(mapper_exe, world_path, colors_file, output_dir)
             print(f"Sleeping {interval}s...")
             time.sleep(interval)
@@ -305,38 +279,27 @@ def run_daemon(mapper_exe, world_path, colors_file, output_dir, interval=30):
             print("\nDaemon stopped.")
             break
         except Exception as e:
-            print(f"ERROR in cycle: {e}")
+            print(f"ERROR: {e}")
             import traceback
             traceback.print_exc()
             time.sleep(10)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Luanti Incremental Map Tile Daemon",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Single render (test):
-  python3 %(prog)s --world /path/to/world --mapper /path/to/minetestmapper --colors /path/to/colors.txt --output ./tiles
-
-  # Continuous daemon:
-  python3 %(prog)s --daemon --world /path/to/world --mapper /path/to/minetestmapper --colors /path/to/colors.txt --output ./tiles
-        """
-    )
+    parser = argparse.ArgumentParser(description="Luanti Map Tile Daemon")
     parser.add_argument("--world", required=True, help="Path to Minetest world directory")
     parser.add_argument("--mapper", required=True, help="Path to minetestmapper executable")
     parser.add_argument("--colors", required=True, help="Path to colors.txt")
     parser.add_argument("--output", required=True, help="Tiles output directory")
     parser.add_argument("--daemon", action="store_true", help="Run continuously")
-    parser.add_argument("--interval", type=int, default=30, help="Seconds between cycles (default: 30)")
+    parser.add_argument("--interval", type=int, default=30, help="Seconds between cycles")
 
     args = parser.parse_args()
 
-    # Validate inputs before doing anything
+    # Pre-flight validation
     errors = []
     if not os.path.isdir(args.world):
-        errors.append(f"World directory not found: {args.world}")
+        errors.append(f"World not found: {args.world}")
     if not os.path.isfile(args.mapper):
         errors.append(f"minetestmapper not found: {args.mapper}")
     if not os.access(args.mapper, os.X_OK):
@@ -346,19 +309,21 @@ Examples:
     map_sqlite = os.path.join(args.world, "map.sqlite")
     if not os.path.isfile(map_sqlite):
         errors.append(f"map.sqlite not found: {map_sqlite}")
+    if not HAS_PIL:
+        errors.append("Pillow (PIL) not installed")
 
     if errors:
-        print("FATAL: Pre-flight validation failed:")
+        print("FATAL: Pre-flight checks failed:")
         for e in errors:
             print(f"  ✗ {e}")
         sys.exit(1)
-    else:
-        print("Pre-flight validation passed:")
-        print(f"  ✓ World: {args.world}")
-        print(f"  ✓ Mapper: {args.mapper}")
-        print(f"  ✓ Colors: {args.colors}")
-        print(f"  ✓ map.sqlite: {map_sqlite}")
-        print(f"  ✓ Output: {args.output}")
+
+    print("Pre-flight OK:")
+    print(f"  ✓ World:  {args.world}")
+    print(f"  ✓ Mapper: {args.mapper}")
+    print(f"  ✓ Colors: {args.colors}")
+    print(f"  ✓ Output: {args.output}")
+    print(f"  ✓ Pillow: installed")
 
     if args.daemon:
         run_daemon(args.mapper, args.world, args.colors, args.output, args.interval)
