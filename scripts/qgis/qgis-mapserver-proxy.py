@@ -8,14 +8,16 @@ import sys
 
 # =========================================================
 # QGIS <-> LUANTI MAPSERVER TRANSLATOR PROXY
+# This script forms a rigid bridge translating QGIS's 
+# Spherical Earth logic into Mapserver's Flat Cartesian plane.
 # =========================================================
 
 PROXY_PORT = 5050
 
-# Mapserver operates on the user's localhost via SSH tunnel!
+# Mapserver ONLY correctly receives the world chunks on localhost.
+# Never change this unless explicitly tunneling!
 MAPSERVER_URL = "http://127.0.0.1:8080"
 LAYER_ID = 0
-INVERT_Y = False
 
 class MapserverProxyHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -25,21 +27,35 @@ class MapserverProxyHandler(http.server.SimpleHTTPRequestHandler):
             x_qgis = int(match.group(2))
             y_qgis = int(match.group(3))
 
+            # The exact math verified by mapserver source
             tile_center = 2 ** (z - 1)
             x_ms = x_qgis - tile_center
-            y_ms = tile_center - y_qgis if INVERT_Y else y_qgis - tile_center
+            y_ms = y_qgis - tile_center
 
-            # The exact API endpoint
+            # The exact endpoint structure verified by web/serve.go
             target_url = f"{MAPSERVER_URL}/api/tile/{LAYER_ID}/{x_ms}/{y_ms}/{z}"
             
             try:
+                # Ask daemon for chunk mapping
                 req = urllib.request.Request(target_url, headers={'User-Agent': 'QGIS-Proxy'})
                 with urllib.request.urlopen(req, timeout=5) as response:
-                    self.send_response(response.getcode())
-                    self.send_header('Content-Type', response.headers.get('Content-Type', 'image/png'))
+                    data = response.read()
+                    
+                    # 763 bytes is Mapserver's hardcoded "white blank tile" for non-existent map geometries!
+                    # We MUST intercept it so QGIS understands it is looking off the edge of the world.
+                    if len(data) == 763:
+                        # By returning a classic 404, QGIS won't paint a white opaque block. 
+                        # It will leave it beautifully transparent inside QGIS!
+                        self.send_response(404)
+                        self.end_headers()
+                        return
+
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'image/png')
                     self.send_header('Access-Control-Allow-Origin', '*')
                     self.end_headers()
-                    self.wfile.write(response.read())
+                    self.wfile.write(data)
+                    
             except urllib.error.HTTPError as e:
                 self.send_response(e.code)
                 self.end_headers()
@@ -55,12 +71,11 @@ class MapserverProxyHandler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     print(f"===========================================================")
-    print(f"      Luanti QGIS Tile Proxy Server Initiated              ")
+    print(f"      QGIS -> Minetest Translation Proxy Active            ")
     print(f"===========================================================")
-    print(f" Proxy Address:  http://127.0.0.1:{PROXY_PORT}/")
-    print(f" Target Server:  {MAPSERVER_URL}")
-    print(f" Target Layer:   {LAYER_ID}")
-    print(f"===========================================================")
+    print(f" Mapserver Target:  {MAPSERVER_URL}")
+    print(f" Target Layer:      {LAYER_ID}")
+    print(f"\n Leave this terminal running while QGIS is open!")
     
     with socketserver.ThreadingTCPServer(("127.0.0.1", PROXY_PORT), MapserverProxyHandler) as httpd:
         try:

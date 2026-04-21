@@ -4,10 +4,9 @@ from qgis.utils import iface
 
 # =========================================================
 # LUANTI MAPSERVER QGIS INTEGRATION SCRIPT
-# Copy and paste this script directly into the QGIS Python Console
+# Execute this strictly in the QGIS Python Console
 # =========================================================
 
-# The Proxy listens on localhost (127.0.0.1) on port 5050
 PROXY_URL = "http://127.0.0.1:5050/tiles/{z}/{x}/{y}"
 
 Z_MIN = 1
@@ -21,24 +20,27 @@ params = {
 }
 
 encoded_url = urllib.parse.urlencode(params)
-
 layer = QgsRasterLayer(encoded_url, "Luanti Live Map", "wms")
 
+# Force QGIS to realize this map lives on Spherical Slippy Coordinates
 crs = QgsCoordinateReferenceSystem("EPSG:3857")
 layer.setCrs(crs)
 
 if layer.isValid():
     QgsProject.instance().addMapLayer(layer)
-    print(f"Success! Proxy mapped to ({PROXY_URL})")
+    print(f"Success! Mapserver layer injected connecting to {PROXY_URL}")
     
-    # MAGIC FIX: Snap QGIS Camera exactly to the Equator (0,0) where the map lives!
-    # Because XYZ maps cover the whole Earth, if you aren't at the exact center, everything is blank!
+    # CRITICAL: Snap QGIS Camera strictly to Minetest Map Bounds
     if iface:
         canvas = iface.mapCanvas()
-        # Create a tiny bounding box at point (0,0) exactly
+        
+        # We manually snap the camera exactly to (0,0) with a 15km viewport radius
+        # If QGIS zooms out further, Mapserver blank tiles will be filtered by the proxy
+        # as transparent, preserving the geometry visibility instead of painting White void!
         extent = QgsRectangle(-15000, -15000, 15000, 15000)
         canvas.setExtent(extent)
         canvas.refresh()
-        print("-> Camera snapped directly to your Game World!")
+        
+        print("-> QGIS Camera locked onto Minetest map geometries.")
 else:
     print("Error: QGIS failed to validate the layer.")
