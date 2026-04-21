@@ -6,6 +6,8 @@ import urllib.error
 import re
 import math
 import sys
+import socket
+
 
 # =========================================================
 # QGIS <-> LUANTI MAPSERVER TRANSLATOR PROXY
@@ -15,10 +17,14 @@ import sys
 # =========================================================
 
 # 1. Configuration
-PROXY_PORT = 5000
+PROXY_PORT = 5050
 
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.connect(("8.8.8.8", 80))
+IP_ADDRESS = s.getsockname()[0]
+s.close()
 # Set this to the exact IP/Port of your Luanti server
-MAPSERVER_URL = "http://192.168.2.14:8080"
+MAPSERVER_URL = f"http://{IP_ADDRESS}"
 LAYER_ID = 1
 
 # If the map renders perfectly but is upside-down (north is south),
