@@ -307,9 +307,10 @@ if [[ "$INTERACTIVE" == true ]]; then
 
         TEMP_ZIP=$(mktemp)
         DOWNLOAD_SUCCESS=false
+        IS_GIT=false
 
         if [[ "$CHOICE" -eq 0 ]]; then
-            echo "Please provide the direct .zip download link of the mod:"
+            echo "Please provide the direct .zip download link or .git repository URL of the mod:"
             read -p "URL ==> " -r MOD_INPUT
             
             if [[ -z "$MOD_INPUT" ]]; then
@@ -318,11 +319,23 @@ if [[ "$INTERACTIVE" == true ]]; then
                 continue
             fi
             
-            print_info "Downloading mod from URL..."
-            if curl -sL "$MOD_INPUT" -o "$TEMP_ZIP"; then
-                DOWNLOAD_SUCCESS=true
+            if [[ "$MOD_INPUT" == *.git ]] || [[ "$MOD_INPUT" == git@* ]]; then
+                print_info "Cloning mod repository..."
+                MOD_EXTRACT_DIR=$(mktemp -d)
+                if git clone -q "$MOD_INPUT" "$MOD_EXTRACT_DIR/repo"; then
+                    DOWNLOAD_SUCCESS=true
+                    IS_GIT=true
+                else
+                    print_error "Failed to clone the mod repository."
+                    rm -rf "$MOD_EXTRACT_DIR"
+                fi
             else
-                print_error "Failed to download the mod."
+                print_info "Downloading mod from URL..."
+                if curl -sL "$MOD_INPUT" -o "$TEMP_ZIP"; then
+                    DOWNLOAD_SUCCESS=true
+                else
+                    print_error "Failed to download the mod."
+                fi
             fi
         elif [[ "$CHOICE" -le "$zip_count" ]]; then
             FILE_INDEX=$((CHOICE - 1))
@@ -362,64 +375,80 @@ if [[ "$INTERACTIVE" == true ]]; then
         fi
 
         if [[ "$DOWNLOAD_SUCCESS" == true ]]; then
-            MOD_EXTRACT_DIR=$(mktemp -d)
-            if unzip -q "$TEMP_ZIP" -d "$MOD_EXTRACT_DIR"; then
-                # Find the actual mod directory inside (often nested)
+            if [[ "$IS_GIT" != true ]]; then
+                MOD_EXTRACT_DIR=$(mktemp -d)
+                if ! unzip -q "$TEMP_ZIP" -d "$MOD_EXTRACT_DIR"; then
+                    print_error "Failed to extract the mod zip."
+                    rm -rf "$MOD_EXTRACT_DIR"
+                    rm -f "$TEMP_ZIP"
+                    echo
+                    continue
+                fi
+            fi
+            
+            # Find the actual mod directory inside (often nested)
+            if [[ "$IS_GIT" == true ]]; then
+                MOD_ROOT_DIR="$MOD_EXTRACT_DIR/repo"
+            else
                 MOD_ROOT_DIR=$(find "$MOD_EXTRACT_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)
-                
-                if [[ -n "$MOD_ROOT_DIR" ]]; then
+            fi
+            
+            if [[ -n "$MOD_ROOT_DIR" ]]; then
+                if [[ "$IS_GIT" == true ]]; then
+                    rm -rf "$MOD_ROOT_DIR/.git"
+                    MOD_NAME=$(basename -s .git "$MOD_INPUT")
+                else
                     MOD_NAME=$(basename "$MOD_ROOT_DIR")
-                    
-                    # Remove trailing -master or version tags commonly found in downloaded zips
-                    CLEAN_MOD_NAME=$(echo "$MOD_NAME" | sed -E 's/-[0-9a-fA-F]+$|-master$//')
-                    
-                    TARGET_MOD_DIR="$MODS_DIR/$CLEAN_MOD_NAME"
-                    
-                    if [ -d "$TARGET_MOD_DIR" ]; then
-                        read -p "Mod '$CLEAN_MOD_NAME' files already exist. Overwrite? (y/n) " -n 1 -r
-                        echo
-                        if [[ "$REPLY" =~ ^[Yy]$ ]]; then
-                            print_warning "Overwriting..."
-                            rm -rf "$TARGET_MOD_DIR"
-                            mv "$MOD_ROOT_DIR" "$TARGET_MOD_DIR"
-                            print_info "Installed mod to $TARGET_MOD_DIR"
-                        else
-                            print_info "Skipped overwriting mod files."
-                        fi
-                    else
+                fi
+                
+                # Remove trailing -master or version tags commonly found in downloaded zips
+                CLEAN_MOD_NAME=$(echo "$MOD_NAME" | sed -E 's/-[0-9a-fA-F]+$|-master$//')
+                
+                TARGET_MOD_DIR="$MODS_DIR/$CLEAN_MOD_NAME"
+                
+                if [ -d "$TARGET_MOD_DIR" ]; then
+                    read -p "Mod '$CLEAN_MOD_NAME' files already exist. Overwrite? (y/n) " -n 1 -r
+                    echo
+                    if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+                        print_warning "Overwriting..."
+                        rm -rf "$TARGET_MOD_DIR"
                         mv "$MOD_ROOT_DIR" "$TARGET_MOD_DIR"
                         print_info "Installed mod to $TARGET_MOD_DIR"
-                    fi
-                    
-                    # Ensure mod is enabled in world.mt
-                    if grep -q "^load_mod_${CLEAN_MOD_NAME}[ =]" "$WORLD_MT"; then
-                        read -p "Mod '$CLEAN_MOD_NAME' is already configured in world.mt. Overwrite and activate? (y/n) " -n 1 -r
-                        echo
-                        if [[ "$REPLY" =~ ^[Yy]$ ]]; then
-                            grep -v "^load_mod_${CLEAN_MOD_NAME}[ =]" "$WORLD_MT" > "${WORLD_MT}.tmp" && mv "${WORLD_MT}.tmp" "$WORLD_MT"
-                            echo "load_mod_${CLEAN_MOD_NAME} = true" >> "$WORLD_MT"
-                            print_info "Enabled mod '$CLEAN_MOD_NAME' in world.mt"
-                        else
-                            print_info "Skipped enabling mod in world.mt."
-                        fi
                     else
-                        echo "load_mod_${CLEAN_MOD_NAME} = true" >> "$WORLD_MT"
-                        print_info "Enabled mod '$CLEAN_MOD_NAME' in world.mt"
-                    fi
-                    
-                    if [ -f "$TARGET_MOD_DIR/mod.conf" ]; then
-                        DEPENDS=$(grep -i -E '^[ \t]*depends[ \t]*=' "$TARGET_MOD_DIR/mod.conf" | cut -d'=' -f2- | xargs)
-                        if [ -n "$DEPENDS" ]; then
-                            print_warning "This recently installed mod depends on other mods: $DEPENDS"
-                            print_warning "Please ensure they are installed before starting the server."
-                        fi
+                        print_info "Skipped overwriting mod files."
                     fi
                 else
-                    print_error "Could not find a valid mod directory in the downloaded zip."
+                    mv "$MOD_ROOT_DIR" "$TARGET_MOD_DIR"
+                    print_info "Installed mod to $TARGET_MOD_DIR"
+                fi
+                
+                # Ensure mod is enabled in world.mt
+                if grep -q "^load_mod_${CLEAN_MOD_NAME}[ =]" "$WORLD_MT"; then
+                    read -p "Mod '$CLEAN_MOD_NAME' is already configured in world.mt. Overwrite and activate? (y/n) " -n 1 -r
+                    echo
+                    if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+                        grep -v "^load_mod_${CLEAN_MOD_NAME}[ =]" "$WORLD_MT" > "${WORLD_MT}.tmp" && mv "${WORLD_MT}.tmp" "$WORLD_MT"
+                        echo "load_mod_${CLEAN_MOD_NAME} = true" >> "$WORLD_MT"
+                        print_info "Enabled mod '$CLEAN_MOD_NAME' in world.mt"
+                    else
+                        print_info "Skipped enabling mod in world.mt."
+                    fi
+                else
+                    echo "load_mod_${CLEAN_MOD_NAME} = true" >> "$WORLD_MT"
+                    print_info "Enabled mod '$CLEAN_MOD_NAME' in world.mt"
+                fi
+                
+                if [ -f "$TARGET_MOD_DIR/mod.conf" ]; then
+                    DEPENDS=$(grep -i -E '^[ \t]*depends[ \t]*=' "$TARGET_MOD_DIR/mod.conf" | cut -d'=' -f2- | xargs)
+                    if [ -n "$DEPENDS" ]; then
+                        print_warning "This recently installed mod depends on other mods: $DEPENDS"
+                        print_warning "Please ensure they are installed before starting the server."
+                    fi
                 fi
             else
-                print_error "Failed to extract the mod zip."
+                print_error "Could not find a valid mod directory."
             fi
+            
             rm -rf "$MOD_EXTRACT_DIR"
         fi
         rm -f "$TEMP_ZIP"
