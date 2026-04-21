@@ -172,6 +172,15 @@ if [ "$AUTO" = false ]; then
     confirm "Do you want to continue?" || exit 0
 fi
 
+# Step 0: Install Luanti game engine
+print_info "=== Step 0/4: Luanti Installation ==="
+if ! command -v /snap/bin/luanti &> /dev/null; then
+    print_info "Luanti not found. Installing via snap..."
+    sudo snap install luanti
+else
+    print_info "Luanti is already installed."
+fi
+
 # Step 1: Run PostgreSQL setup
 print_info "=== Step 1/4: PostgreSQL Setup ==="
 if [ "$AUTO" = true ]; then
