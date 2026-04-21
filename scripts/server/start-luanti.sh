@@ -525,7 +525,8 @@ After=network.target
 Type=simple
 User=${CURRENT_USER}
 WorkingDirectory=${PROJECT_ROOT}
-ExecStart=/usr/bin/python3 ${PROJECT_ROOT}/scripts/map/serve-tiles.py --port ${MAP_PORT} --dir ${TILES_DIR}
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 -u ${PROJECT_ROOT}/scripts/map/serve-tiles.py --port ${MAP_PORT} --dir ${TILES_DIR}
 Restart=always
 RestartSec=10
 

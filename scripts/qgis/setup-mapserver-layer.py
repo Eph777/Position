@@ -3,44 +3,47 @@ from qgis.core import QgsRasterLayer, QgsProject, QgsCoordinateReferenceSystem, 
 from qgis.utils import iface
 
 # =========================================================
-# LUANTI NATIVE MAPSERVER QGIS INTEGRATION
-# Execute this strictly inside the QGIS Python Console
+# LUANTI NATIVE MAP TILE VIEWER FOR QGIS
+# Execute this inside the QGIS Python Console
 # =========================================================
 
-# The target is the Multipass VM IP. 
-# Our custom static python server exposes standard `.png` tiles.
-TILE_SERVER_URL = "http://192.168.2.14:8080/{z}/{x}/{y}.png"
-Z_MIN = 6
-Z_MAX = 13 
+# The Multipass VM IP. Change this if your VM has a different address.
+VM_IP = "192.168.2.14"
+TILE_PORT = 8080
+
+TILE_URL = f"http://{VM_IP}:{TILE_PORT}/{{z}}/{{x}}/{{y}}.png"
+
+# These should match what the daemon generates. 
+# The daemon writes metadata.txt with the actual max_zoom.
+Z_MIN = 0
+Z_MAX = 8  # Will work even if the daemon uses a different max - QGIS just won't find tiles at unused levels
 
 params = {
     'type': 'xyz',
-    'url': TILE_SERVER_URL,
+    'url': TILE_URL,
     'zMin': str(Z_MIN),
     'zMax': str(Z_MAX),
 }
 
-encoded_url = urllib.parse.urlencode(params)
-layer = QgsRasterLayer(encoded_url, "Luanti Native Map", "wms")
+encoded = urllib.parse.urlencode(params)
 
-# Crucially lock it to EPSG:3857 since our Python generator physically 
-# projects chunks into Slippy Map grid positions using minetestmapper bounds.
-crs = QgsCoordinateReferenceSystem("EPSG:3857")
-layer.setCrs(crs)
+# Remove old layer if it exists
+for layer in QgsProject.instance().mapLayersByName("Luanti Map"):
+    QgsProject.instance().removeMapLayer(layer.id())
+
+layer = QgsRasterLayer(encoded, "Luanti Map", "wms")
 
 if layer.isValid():
     QgsProject.instance().addMapLayer(layer)
-    print(f"Success! Native layer attached to {TILE_SERVER_URL}")
+    print(f"Layer added: {TILE_URL}")
     
     if iface:
         canvas = iface.mapCanvas()
-        
-        # Warp the QGIS Camera mathematically onto the Origin chunk of your Minetest World (Tile(0, 0) at Zoom 13)
-        # Because we output standard XYZ files, empty space returns 404 natively!
-        extent = QgsRectangle(-10000, -10000, 10000, 10000)
+        # Snap to a reasonable view around the origin
+        extent = QgsRectangle(-5000, -5000, 5000, 5000)
         canvas.setExtent(extent)
         canvas.refresh()
-        
-        print("-> QGIS Camera locked onto Minetest map origin.")
+        print("Camera snapped to origin.")
 else:
-    print("Error: QGIS failed to validate the layer.")
+    print(f"ERROR: Layer failed to validate. URL: {TILE_URL}")
+    print("Check that serve-tiles.py is running on the VM and the port is accessible.")
