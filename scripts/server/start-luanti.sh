@@ -479,31 +479,84 @@ if [ -n "$MAP_PORT" ]; then
 
     check_port "$MAP_PORT" --kill || exit 1
 
-    print_info "Setting up Mapserver services on port $MAP_PORT..."
+    print_info "Setting up Python Native Map Generators on port $MAP_PORT..."
     
-    # Run map hosting setup script
-    print_info "Configuring Mapserver..."
-    "$PROJECT_ROOT/scripts/map/setup-hosting.sh" "$WORLD" "$MAP_PORT" || {
-        print_error "Failed to setup map services"
+    DAEMON_SERVICE="luanti-map-daemon@${WORLD}"
+    SERVER_SERVICE="luanti-map-server@${WORLD}"
+    
+    TILES_DIR="${WORLD_PATH}/tiles"
+    mkdir -p "$TILES_DIR"
+    
+    # Check if minetest-mapper exists
+    if [ ! -f "$USER_HOME/minetest-mapper/minetestmapper" ]; then
+        print_error "minetest-mapper not installed! Run scripts/setup/mapper.sh first."
         exit 1
-    }
+    fi
     
-    # Ensure mapserver mod is enabled in world.mt
-    if ! grep -q "^load_mod_mapserver[ =]*true" "$WORLD_MT"; then
-        print_info "Activating mapserver mod in world.mt..."
+    print_info "Creating systemd Background Daemon..."
+    sudo tee "/etc/systemd/system/${DAEMON_SERVICE}.service" > /dev/null <<EOF
+[Unit]
+Description=Luanti Map Incremental Generator - ${WORLD}
+After=network.target
+
+[Service]
+Type=simple
+User=${CURRENT_USER}
+WorkingDirectory=${PROJECT_ROOT}
+ExecStart=/usr/bin/python3 ${PROJECT_ROOT}/scripts/map/luanti-map-daemon.py --daemon --world ${WORLD_PATH} --mapper ${USER_HOME}/minetest-mapper/minetestmapper --colors ${USER_HOME}/minetest-mapper/colors.txt --output ${TILES_DIR}
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=luanti-map-daemon-${WORLD}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    print_info "Creating systemd static Tile Server..."
+    sudo tee "/etc/systemd/system/${SERVER_SERVICE}.service" > /dev/null <<EOF
+[Unit]
+Description=Luanti Static Tile Server - ${WORLD}
+After=network.target
+
+[Service]
+Type=simple
+User=${CURRENT_USER}
+WorkingDirectory=${PROJECT_ROOT}
+ExecStart=/usr/bin/python3 ${PROJECT_ROOT}/scripts/map/serve-tiles.py --port ${MAP_PORT} --dir ${TILES_DIR}
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=luanti-map-server-${WORLD}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable "${DAEMON_SERVICE}" "${SERVER_SERVICE}"
+    sudo systemctl start "${DAEMON_SERVICE}" "${SERVER_SERVICE}"
+    
+    # Ensure mapserver mod is disabled natively so it stops collecting garbage data in sqlite
+    if grep -q "^load_mod_mapserver[ =]*true" "$WORLD_MT"; then
+        print_info "Deactivating deprecated mapserver mod in world.mt..."
         grep -v "^load_mod_mapserver[ =]" "$WORLD_MT" > "${WORLD_MT}.tmp" && mv "${WORLD_MT}.tmp" "$WORLD_MT"
-        echo "load_mod_mapserver = true" >> "$WORLD_MT"
+        echo "load_mod_mapserver = false" >> "$WORLD_MT"
     fi
     
     # Verify services are running
     sleep 2
-    if systemctl is-active --quiet "luanti-mapserver@${WORLD}"; then
+    if systemctl is-active --quiet "${SERVER_SERVICE}"; then
         print_info "Map services started successfully!"
-        print_info "Map will be available at: http://$(hostname -I | awk '{print $1}'):$MAP_PORT/"
-        print_info "QGIS XYZ Tile URL: http://$(hostname -I | awk '{print $1}'):$MAP_PORT/api/tile/1/{x}/{y}/{z}"
+        print_info "Map base URL: http://$(hostname -I | awk '{print $1}'):$MAP_PORT/"
+        print_info "QGIS XYZ Tile URL: http://$(hostname -I | awk '{print $1}'):$MAP_PORT/{z}/{x}/{y}.png"
     else
         print_warning "Map services may not have started correctly. Check with:"
-        echo "  sudo systemctl status luanti-mapserver@${WORLD}"
+        echo "  sudo systemctl status ${SERVER_SERVICE}"
     fi
     echo ""
 fi

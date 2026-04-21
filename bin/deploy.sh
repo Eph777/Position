@@ -197,10 +197,6 @@ print_info "=== Step 2/4: Backend Migration ==="
 print_info "=== Step 3/4: Map Renderer Setup ==="
 "$PROJECT_ROOT/scripts/setup/mapper.sh" "$WORLD_NAME"
 
-# Step 4: Setup map hosting
-print_info "=== Step 4/4: Map Hosting Setup ==="
-"$PROJECT_ROOT/scripts/map/setup-hosting.sh" "$WORLD_NAME"
-
 # Final summary
 echo ""
 print_info "================================================================"

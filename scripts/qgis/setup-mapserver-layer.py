@@ -3,44 +3,44 @@ from qgis.core import QgsRasterLayer, QgsProject, QgsCoordinateReferenceSystem, 
 from qgis.utils import iface
 
 # =========================================================
-# LUANTI MAPSERVER QGIS INTEGRATION SCRIPT
-# Execute this strictly in the QGIS Python Console
+# LUANTI NATIVE MAPSERVER QGIS INTEGRATION
+# Execute this strictly inside the QGIS Python Console
 # =========================================================
 
-PROXY_URL = "http://127.0.0.1:5050/tiles/{z}/{x}/{y}"
-
-Z_MIN = 1
+# The target is the Multipass VM IP. 
+# Our custom static python server exposes standard `.png` tiles.
+TILE_SERVER_URL = "http://192.168.2.14:8080/{z}/{x}/{y}.png"
+Z_MIN = 6
 Z_MAX = 13 
 
 params = {
     'type': 'xyz',
-    'url': PROXY_URL,
+    'url': TILE_SERVER_URL,
     'zMin': str(Z_MIN),
     'zMax': str(Z_MAX),
 }
 
 encoded_url = urllib.parse.urlencode(params)
-layer = QgsRasterLayer(encoded_url, "Luanti Live Map", "wms")
+layer = QgsRasterLayer(encoded_url, "Luanti Native Map", "wms")
 
-# Force QGIS to realize this map lives on Spherical Slippy Coordinates
+# Crucially lock it to EPSG:3857 since our Python generator physically 
+# projects chunks into Slippy Map grid positions using minetestmapper bounds.
 crs = QgsCoordinateReferenceSystem("EPSG:3857")
 layer.setCrs(crs)
 
 if layer.isValid():
     QgsProject.instance().addMapLayer(layer)
-    print(f"Success! Mapserver layer injected connecting to {PROXY_URL}")
+    print(f"Success! Native layer attached to {TILE_SERVER_URL}")
     
-    # CRITICAL: Snap QGIS Camera strictly to Minetest Map Bounds
     if iface:
         canvas = iface.mapCanvas()
         
-        # We manually snap the camera exactly to (0,0) with a 15km viewport radius
-        # If QGIS zooms out further, Mapserver blank tiles will be filtered by the proxy
-        # as transparent, preserving the geometry visibility instead of painting White void!
-        extent = QgsRectangle(-15000, -15000, 15000, 15000)
+        # Warp the QGIS Camera mathematically onto the Origin chunk of your Minetest World (Tile(0, 0) at Zoom 13)
+        # Because we output standard XYZ files, empty space returns 404 natively!
+        extent = QgsRectangle(-10000, -10000, 10000, 10000)
         canvas.setExtent(extent)
         canvas.refresh()
         
-        print("-> QGIS Camera locked onto Minetest map geometries.")
+        print("-> QGIS Camera locked onto Minetest map origin.")
 else:
     print("Error: QGIS failed to validate the layer.")
