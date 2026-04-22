@@ -355,11 +355,10 @@ Each world automatically gets its own QGIS view when the mod loads:
 1. **Install QGIS**
 
 2. **Add Map Background (XYZ Tiles)**:
-   - In Browser Panel, right-click **XYZ Tiles**
+   - In Browser Panel, right-click **XYZ Tiles** -> **New Connection...**
    - New Connection Name: `Luanti Map`
-   - URL: `http://<server-ip>:8080/{z}/{x}/{y}.png`
-   - **Important**: If the source shows as "broken" or empty, use the TMS Y-axis:
-     `http://<server-ip>:8080/{z}/{x}/{-y}.png`
+   - URL: `http://<server-ip>:8080/{z}/{x}/{-y}.png`
+   - **Recommended Zoom**: Set Min to `0` and Max to `18` (lossless detailed view).
    - Add to map
 
 3. **Add PostGIS Layer (Player Positions)**:

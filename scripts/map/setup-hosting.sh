@@ -36,7 +36,9 @@ SERVICE_USER=$(get_current_user)
 USER_HOME=$(get_user_home)
 PROJECT_ROOT=$(get_project_root)
 WORLD_PATH="$USER_HOME/snap/luanti/common/.minetest/worlds/$WORLD"
-MAP_OUTPUT_DIR="$WORLD_PATH/map_output"  # Store maps inside world folder
+MAP_OUTPUT_DIR="$WORLD_PATH/map_output"
+MAPPER_EXE="$USER_HOME/minetest-mapper/minetestmapper"
+COLORS_FILE="$USER_HOME/minetest-mapper/colors.txt"
 
 # Ensure world exists
 if [ ! -d "$WORLD_PATH" ]; then
@@ -64,7 +66,12 @@ Description=Luanti Map Auto-Renderer - ${WORLD} (${RENDER_INTERVAL}s Interval)
 Type=simple
 User=${SERVICE_USER}
 WorkingDirectory=$PROJECT_ROOT
-ExecStart=/bin/bash $PROJECT_ROOT/scripts/map/auto-render.sh $WORLD $RENDER_INTERVAL
+ExecStart=/usr/bin/python3 $PROJECT_ROOT/scripts/map/luanti-map-tiler.py \
+    --world "$WORLD_PATH" \
+    --mapper "$MAPPER_EXE" \
+    --colors "$COLORS_FILE" \
+    --output "$MAP_OUTPUT_DIR/tiles" \
+    --daemon --interval $RENDER_INTERVAL
 Restart=always
 
 [Install]
@@ -101,7 +108,8 @@ sudo systemctl enable luanti-map-server@${WORLD}
 sudo systemctl start luanti-map-server@${WORLD}
 
 print_info "Map services started successfully!"
-echo "QGIS XYZ Connection: http://$(hostname -I | awk '{print $1}'):${MAP_PORT}/{z}/{x}/{y}.png"
+echo "QGIS Connection (Lossless): http://$(hostname -I | awk '{print $1}'):${MAP_PORT}/{z}/{x}/{-y}.png"
+echo "  Note: Use Zoom Level 18 for 1:1 node-to-pixel quality."
 echo ""
 print_info "Service Management Commands:"
 echo "  Status:  sudo systemctl status luanti-map-render@${WORLD}"

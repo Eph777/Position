@@ -339,13 +339,12 @@ Instead of adding a "Raster Layer", use the **XYZ Tiles** provider:
 
 1. Open QGIS.
 2. **Add Map Background (XYZ Tiles)**:
-   - In Browser Panel, right-click **XYZ Tiles**
-   - New Connection Name: `Luanti Map`
-   - URL: `http://<server-ip>:8080/{z}/{x}/{y}.png`
-   - **Note**: If the map doesn't appear or shows as broken, use the TMS Y-axis:
-     `http://<server-ip>:8080/{z}/{x}/{-y}.png`
-   - Add to map
-5. Click **OK** and drag the layer onto the map.
+   - In Browser Panel, right-click **XYZ Tiles** -> **New Connection...**
+   - Name: `Luanti Map`
+   - URL: `http://<YOUR_SERVER_IP>:8080/{z}/{x}/{-y}.png`
+   - **Recommended Zoom**: Set Min to `0` and Max to `18`.
+   - **Note**: Zoom Level 18 provides **1:1 lossless quality** (1 node = 1 pixel).
+   - Click **OK**, then drag the layer onto the map.
 
 ## Backup and Restore
 
