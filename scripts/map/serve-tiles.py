@@ -44,9 +44,13 @@ class CORSRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
 def start_server(directory, port):
-    if not os.path.isdir(directory):
-        print(f"❌ Error: Directory '{directory}' does not exist.")
-        sys.exit(1)
+    if not os.path.exists(directory):
+        print(f"⚠️ Warning: Directory '{directory}' does not exist. Creating it...")
+        try:
+            os.makedirs(directory, exist_ok=True)
+        except Exception as e:
+            print(f"❌ Error: Could not create directory '{directory}': {e}")
+            sys.exit(1)
 
     os.chdir(directory)
     
