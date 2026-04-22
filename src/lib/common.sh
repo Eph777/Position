@@ -194,6 +194,48 @@ update_config_value() {
     fi
 }
 
+# Update or append a key=value pair in an .env file
+# Usage: update_env_value <file> <key> <value>
+update_env_value() {
+    local file=$1
+    local key=$2
+    local value=$3
+    
+    mkdir -p "$(dirname "$file")"
+    [ ! -f "$file" ] && touch "$file"
+    
+    if grep -q "^${key}=" "$file"; then
+        # Use simple sed replacement for standard keys
+        sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+    else
+        echo "${key}=${value}" >> "$file"
+    fi
+}
+
+# Prompt user for a value and update .env
+# Usage: prompt_env_value <var_name> <display_name> <default_value> [env_file]
+prompt_env_value() {
+    local var_name=$1
+    local display_name=$2
+    local default_value=$3
+    local env_file=$4
+    
+    # Get current value from environment or default
+    local current_val="${!var_name:-$default_value}"
+    
+    echo -n -e "${YELLOW}[PROMPT]${NC} $display_name [$current_val]: "
+    read input_val
+    local final_val="${input_val:-$current_val}"
+    
+    # Update variable in current shell
+    printf -v "$var_name" '%s' "$final_val"
+    
+    # Update .env file if provided
+    if [ -n "$env_file" ]; then
+        update_env_value "$env_file" "$var_name" "$final_val"
+    fi
+}
+
 # Download and install a game from a zip URL
 # Usage: install_game_from_zip <url>
 install_game_from_zip() {
@@ -270,5 +312,7 @@ export -f load_env
 export -f command_exists
 export -f confirm
 export -f update_config_value
+export -f update_env_value
+export -f prompt_env_value
 export -f install_game_from_zip
 

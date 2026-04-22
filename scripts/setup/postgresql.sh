@@ -44,44 +44,19 @@ ENV_FILE="$CONFIG_DIR/.env"
 mkdir -p "$CONFIG_DIR"
 print_info "--- Database Configuration ---"
 
-# Set default values
-DEFAULT_DB_NAME="luanti_db"
-DEFAULT_DB_USER="luanti"
-DEFAULT_DB_PASS="postgres123"
-
 # Load existing values if file exists
-if [ -f "$ENV_FILE" ]; then
-    load_env "$ENV_FILE"
-fi
+[ -f "$ENV_FILE" ] && load_env "$ENV_FILE"
 
-# Use existing values as defaults, or hardcoded defaults if not set
-DB_NAME=${DB_NAME:-$DEFAULT_DB_NAME}
-DB_USER=${DB_USER:-$DEFAULT_DB_USER}
-DB_PASS=${DB_PASS:-$DEFAULT_DB_PASS}
+# Prompt for values and persist to .env
+prompt_env_value "DB_NAME" "Database Name" "luanti_db" "$ENV_FILE"
+prompt_env_value "DB_USER" "Database User" "luanti" "$ENV_FILE"
+prompt_env_value "DB_PASS" "Database Password" "postgres123" "$ENV_FILE"
 
-# Prompt the user (interactive even in --auto mode)
-echo -n -e "${YELLOW}[PROMPT]${NC} Database Name [$DB_NAME]: "
-read input_db_name
-DB_NAME=${input_db_name:-$DB_NAME}
+# Ensure other standard database variables are set in .env
+update_env_value "$ENV_FILE" "DB_HOST" "${DB_HOST:-localhost}"
+update_env_value "$ENV_FILE" "DB_PORT" "${DB_PORT:-5432}"
 
-echo -n -e "${YELLOW}[PROMPT]${NC} Database User [$DB_USER]: "
-read input_db_user
-DB_USER=${input_db_user:-$DB_USER}
-
-echo -n -e "${YELLOW}[PROMPT]${NC} Database Password [$DB_PASS]: "
-read input_db_pass
-DB_PASS=${input_db_pass:-$DB_PASS}
-
-# Save/Update .env file
-cat > "$ENV_FILE" <<EOF
-DB_HOST=localhost
-DB_NAME=${DB_NAME}
-DB_USER=${DB_USER}
-DB_PASS=${DB_PASS}
-DB_PORT=5432
-EOF
-
-print_info "Configuration saved to $ENV_FILE"
+print_info "Configuration updated in $ENV_FILE"
 
 print_info "=== Luanti/QGIS - PostgreSQL Setup ==="
 echo ""
