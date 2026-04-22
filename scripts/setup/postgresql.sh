@@ -223,40 +223,12 @@ PGPASSWORD=${DB_PASS} psql -U ${DB_USER} -d ${DB_NAME} -f schema.sql
 print_info "Python application setup complete!"
 
 # Step 6: Install Luanti game content
-print_info "Step 6/9: Installing Luanti game content..."
-
-# Create directories
-mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/games
-mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld
-mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/mods
-
-# Clone Minetest Game
-if [ ! -d ${USER_HOME}/snap/luanti/common/.minetest/games/minetest_game ]; then
-    print_info "Downloading Minetest Game..."
-    git clone https://github.com/minetest/minetest_game.git ${USER_HOME}/snap/luanti/common/.minetest/games/minetest_game
+if [ -f "$PROJECT_ROOT/scripts/setup/install-luanti-content.sh" ]; then
+    bash "$PROJECT_ROOT/scripts/setup/install-luanti-content.sh"
 else
-    print_info "Minetest Game already exists, skipping..."
+    print_error "Could not find install-luanti-content.sh script!"
+    exit 1
 fi
-
-# Create world configuration
-print_info "Creating world configuration..."
-echo "gameid = minetest_game" > ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld/world.mt
-echo "backend = sqlite3" >> ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld/world.mt
-echo "load_mod_position_tracker = true" >> ${USER_HOME}/snap/luanti/common/.minetest/worlds/myworld/world.mt
-
-# Copy mod
-print_info "Installing or updating position tracker mod..."
-mkdir -p ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker
-cp -r "$PROJECT_ROOT/mod/"* ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker/
-
-# Configure mod
-print_info "Configuring mod..."
-sed -i 's|local SERVER_URL = .*|local SERVER_URL = "http://localhost:5000/position"|' ${USER_HOME}/snap/luanti/common/.minetest/mods/position_tracker/init.lua
-
-# Create minetest.conf
-echo "secure.http_mods = position_tracker" > ${USER_HOME}/snap/luanti/common/.minetest/minetest.conf
-
-print_info "Luanti setup complete!"
 
 # Step 7: Check for port conflicts and create systemd service
 print_info "Step 7/9: Checking for port conflicts..."
