@@ -32,14 +32,56 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Configuration
-DB_NAME="luanti_db"
-DB_USER="luanti"
-DB_PASS="postgres123"
 PYTHON_VERSION="python3"
 
 USER_HOME=$(get_user_home)
 CURRENT_USER=$(get_current_user)
 PROJECT_ROOT=$(get_project_root)
+CONFIG_DIR="$PROJECT_ROOT/config"
+ENV_FILE="$CONFIG_DIR/.env"
+
+# Database Configuration Prompts
+mkdir -p "$CONFIG_DIR"
+print_info "--- Database Configuration ---"
+
+# Set default values
+DEFAULT_DB_NAME="luanti_db"
+DEFAULT_DB_USER="luanti"
+DEFAULT_DB_PASS="postgres123"
+
+# Load existing values if file exists
+if [ -f "$ENV_FILE" ]; then
+    load_env "$ENV_FILE"
+fi
+
+# Use existing values as defaults, or hardcoded defaults if not set
+DB_NAME=${DB_NAME:-$DEFAULT_DB_NAME}
+DB_USER=${DB_USER:-$DEFAULT_DB_USER}
+DB_PASS=${DB_PASS:-$DEFAULT_DB_PASS}
+
+# Prompt the user (interactive even in --auto mode)
+echo -n -e "${YELLOW}[PROMPT]${NC} Database Name [$DB_NAME]: "
+read input_db_name
+DB_NAME=${input_db_name:-$DB_NAME}
+
+echo -n -e "${YELLOW}[PROMPT]${NC} Database User [$DB_USER]: "
+read input_db_user
+DB_USER=${input_db_user:-$DB_USER}
+
+echo -n -e "${YELLOW}[PROMPT]${NC} Database Password [$DB_PASS]: "
+read input_db_pass
+DB_PASS=${input_db_pass:-$DB_PASS}
+
+# Save/Update .env file
+cat > "$ENV_FILE" <<EOF
+DB_HOST=localhost
+DB_NAME=${DB_NAME}
+DB_USER=${DB_USER}
+DB_PASS=${DB_PASS}
+DB_PORT=5432
+EOF
+
+print_info "Configuration saved to $ENV_FILE"
 
 print_info "=== Luanti/QGIS - PostgreSQL Setup ==="
 echo ""
@@ -156,15 +198,23 @@ print_info "Installing Python dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# Create .env file
-print_info "Creating .env configuration file..."
-cat > .env <<EOF
+# Ensure .env file in config is up to date (already created at start, but ensuring here)
+print_info "Ensuring config/.env is present..."
+if [ ! -f "$ENV_FILE" ]; then
+    cat > "$ENV_FILE" <<EOF
 DB_HOST=localhost
 DB_NAME=${DB_NAME}
 DB_USER=${DB_USER}
 DB_PASS=${DB_PASS}
 DB_PORT=5432
 EOF
+fi
+
+# Remove old .env in root if it exists
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    print_info "Cleaning up old .env file from project root..."
+    rm "$PROJECT_ROOT/.env"
+fi
 
 # Import database schema
 print_info "Importing database schema..."
@@ -253,7 +303,7 @@ Type=simple
 User=${CURRENT_USER}
 WorkingDirectory=$PROJECT_ROOT
 Environment="PATH=$PROJECT_ROOT/venv/bin"
-EnvironmentFile=$PROJECT_ROOT/.env
+EnvironmentFile=$PROJECT_ROOT/config/.env
 ExecStart=$PROJECT_ROOT/venv/bin/python3 $PROJECT_ROOT/src/server.py
 Restart=always
 RestartSec=10
