@@ -29,6 +29,7 @@ SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
 PROJECT_ROOT=$(dirname "$SCRIPT_DIR")
 echo "$PROJECT_ROOT" > /root/.proj_root
 source "$PROJECT_ROOT/src/lib/common.sh"
+ENV_FILE="$PROJECT_ROOT/config/.env"
 
 # Default values
 AUTO=false
@@ -213,7 +214,7 @@ echo ""
 echo "  3. View map:"
 echo "     http://$(hostname -I | awk '{print $1}'):8080/map.png"
 echo ""
-print_info "Configuration saved in: $PROJECT_ROOT/.env"
+print_info "Configuration saved in: $ENV_FILE"
 echo ""
 print_info "To check status: $0 --status"
 print_info "To update deployment: $0 --update"
