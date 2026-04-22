@@ -338,10 +338,14 @@ sudo journalctl -u luanti-map-render@myworld -n 50
 Instead of adding a "Raster Layer", use the **XYZ Tiles** provider:
 
 1. Open QGIS.
-2. In the **Browser Panel**, right-click **XYZ Tiles** -> **New Connection...**.
-3. **Name**: Luanti Map
-4. **URL**: `http://<YOUR_SERVER_IP>:8080/{z}/{x}/{y}.png`
-5. Click **OK** and drag the layer onto the map map.
+2. **Add Map Background (XYZ Tiles)**:
+   - In Browser Panel, right-click **XYZ Tiles**
+   - New Connection Name: `Luanti Map`
+   - URL: `http://<server-ip>:8080/{z}/{x}/{y}.png`
+   - **Note**: If the map doesn't appear or shows as broken, use the TMS Y-axis:
+     `http://<server-ip>:8080/{z}/{x}/{-y}.png`
+   - Add to map
+5. Click **OK** and drag the layer onto the map.
 
 ## Backup and Restore
 

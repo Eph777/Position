@@ -25,6 +25,12 @@ class CORSRequestHandler(http.server.SimpleHTTPRequestHandler):
     HTTP Request Handler with CORS headers support.
     Needed for web-based GIS clients and cross-origin access.
     """
+    def guess_type(self, path):
+        # Explicitly handle PNG tiles to ensure QGIS/browsers recognize them correctly
+        if path.lower().endswith(".png"):
+            return "image/png"
+        return super().guess_type(path)
+
     def end_headers(self):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
@@ -52,6 +58,12 @@ def start_server(directory, port):
             print(f"\n✅ Remote Tile Server is live!")
             print(f"📁 Serving content from: {directory}")
             print(f"🌐 Reachable at: http://<YOUR_SERVER_IP_ADDRESS>:{port}/{{z}}/{{x}}/{{y}}.png")
+            print(f"  2. **Add Map Background (XYZ Tiles)**:")
+            print(f"   - In Browser Panel, right-click **XYZ Tiles**")
+            print(f"   - New Connection Name: `Luanti Map`")
+            print(f"   - URL: `http://<server-ip>:8080/{{z}}/{{x}}/{{y}}.png`")
+            print(f"   - **Crucial**: If the map looks inverted or doesn't show up, try `http://<server-ip>:8080/{{z}}/{{x}}/{{-y}}.png` (some GDAL versions use the TMS Y-axis convention).")
+            print(f"   - Add to map")
             print(f"🛑 Press Ctrl+C to stop.")
             
             try:
