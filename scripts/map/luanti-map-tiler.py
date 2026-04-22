@@ -12,7 +12,6 @@ import subprocess
 import time
 import argparse
 import math
-import shutil
 from pathlib import Path
 
 try:
@@ -21,13 +20,11 @@ try:
 except ImportError:
     HAS_PIL = False
 
-# --- CONFIGURATION ---
+# --- CONSTANTS (EPSG:3857) ---
 TILE_SIZE = 256
-MAX_ZOOM = 18  # 1 node approx 1.6 pixels. Level 17 is approx 0.8px. Level 18 is better for detail.
-# At Z=18, the world is 262,144 tiles wide.
-# Center (0,0) is at tile (131072, 131072)
-CENTER = 2 ** (MAX_ZOOM - 1)
-# ---------------------
+CIRCUMFERENCE = 40075016.68557849
+ORIGIN_SHIFT = CIRCUMFERENCE / 2.0
+# -----------------------------
 
 def get_world_extent(mapper_exe, world_path, colors_file):
     """Get the absolute boundaries of the world in nodes from minetestmapper."""
@@ -39,91 +36,92 @@ def get_world_extent(mapper_exe, world_path, colors_file):
     # Match format: -640:-144+880+896
     m = re.search(r"([-0-9]+):([-0-9]+)\+([0-9]+)\+([0-9]+)", output)
     if m:
-        left = int(m.group(1))
-        bottom = int(m.group(2))
-        width = int(m.group(3))
-        height = int(m.group(4))
-        return left, bottom, width, height
+        return int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))
     return None
 
-def game_to_tile(gx, gz, zoom):
-    """
-    Convert game coordinates (nodes) to slippy map tile indices.
-    Assumes 1 node = resolution of zoom level 18 approx.
-    Using the standard Web Mercator math but normalized for Luanti.
-    """
-    # At zoom 18, 1 pixel is ~0.597 meters.
-    # To keep it simple and aligned, we map 1 node = 1 pixel offset in the grid.
-    # This is a 'True-Scale' Luanti-Mercator where node (0,0) is center.
-    tx = CENTER + math.floor(gx / TILE_SIZE)
-    # Note: Luanti +Z is North (Up), Image +Y is South (Down)
-    ty = CENTER - math.floor(gz / TILE_SIZE) - 1
+def latlon_to_mercator(lon, lat):
+    """Convert Lat/Lon to EPSG:3857 Meters."""
+    x = lon * ORIGIN_SHIFT / 180.0
+    y = math.log(math.tan((90 + lat) * math.pi / 360.0)) / (math.pi / 180.0)
+    y = y * ORIGIN_SHIFT / 180.0
+    return x, y
+
+def mercator_to_tile(mx, my, zoom):
+    """Convert Mercator Meters to Tile Indices."""
+    res = CIRCUMFERENCE / (2.0**zoom)
+    tx = math.floor((mx + ORIGIN_SHIFT) / res)
+    ty = math.floor((ORIGIN_SHIFT - my) / res)
     return int(tx), int(ty)
 
-def tile_to_game(tx, ty, zoom):
-    """Convert tile index back to the bottom-left game coordinate of that tile."""
-    gx = (tx - CENTER) * TILE_SIZE
-    gz = (CENTER - ty - 1) * TILE_SIZE
-    return int(gx), int(gz)
+def tile_bounds_mercator(tx, ty, zoom):
+    """Get the exact Mercator bounds for a specific tile."""
+    res = CIRCUMFERENCE / (2.0**zoom)
+    left = tx * res - ORIGIN_SHIFT
+    top = ORIGIN_SHIFT - ty * res
+    return left, top - res, left + res, top  # left, bottom, right, top
 
 def render_tile(mapper_exe, world_path, colors_file, tx, ty, zoom, output_path):
-    """Renders a single 256x256 tile using minetestmapper --geometry."""
-    gx, gz = tile_to_game(tx, ty, zoom)
+    """Renders a single tile with exact Mercator geometry."""
+    l, b, r, t = tile_bounds_mercator(tx, ty, zoom)
     
-    # minetestmapper geometry format: x:z+w+h  (z is the bottom-most coordinate)
-    geom = f"{gx}:{gz}+{TILE_SIZE}+{TILE_SIZE}"
+    # minetestmapper geometry: left:bottom+width+height (supports floats)
+    width = r - l
+    height = t - b
+    geom = f"{l}:{b}+{width}+{height}"
+    
+    # We render to a temporary file at its native resolution, then scale to 256x256
+    temp_path = output_path.with_suffix(".tmp.png")
     
     cmd = [
         mapper_exe,
         "--input", world_path,
-        "--output", str(output_path),
+        "--output", str(temp_path),
         "--geometry", geom,
         "--colors", colors_file,
-        "--bgcolor", "#00000000" # Fully transparent
+        "--bgcolor", "#00000000"
     ]
     
     subprocess.run(cmd, capture_output=True)
     
-    # Check if tile has any content (skip if it's just a tiny empty PNG)
-    if os.path.exists(output_path) and os.path.getsize(output_path) < 400:
+    if os.path.exists(temp_path):
+        if os.path.getsize(temp_path) < 400:
+            os.remove(temp_path)
+            return False
+            
         if HAS_PIL:
-            # More thorough check with PIL
-            img = Image.open(output_path)
-            if not img.getbbox(): # All transparent
-                img.close()
-                os.remove(output_path)
-                return False
-            img.close()
-    return os.path.exists(output_path)
+            with Image.open(temp_path) as img:
+                # Use NEAREST resampling to preserve pixel-art/node quality perfectly
+                # This fixes the "bad quality/blurriness"
+                resized = img.resize((TILE_SIZE, TILE_SIZE), Image.Resampling.NEAREST)
+                resized.save(output_path, "PNG", compress_level=0) # No compression for speed/quality
+            os.remove(temp_path)
+            return True
+        else:
+            os.replace(temp_path, output_path)
+            return True
+    return False
 
 def build_pyramid(output_dir, z_max):
-    """Build lower zoom levels by merging 2x2 blocks of tiles."""
-    if not HAS_PIL:
-        print("⚠️ Pillow not installed! Skipping pyramid generation.")
-        return
-
-    print("[*] Building zoom pyramid...")
-    for z in range(z_max - 1, z_max - 6, -1):
+    """Upscale high-zoom tiles into lower zoom levels using NEAREST merging."""
+    if not HAS_PIL: return
+    print("[*] Merging zoom pyramid (lossless)...")
+    for z in range(z_max - 1, z_max - 5, -1):
         high_dir = Path(output_dir) / str(z + 1)
         low_dir = Path(output_dir) / str(z)
-        
         if not high_dir.exists(): continue
-        
         processed = set()
         for x_path in high_dir.iterdir():
             if not x_path.is_dir(): continue
             hx = int(x_path.name)
             for y_file in x_path.glob("*.png"):
+                if y_file.suffix != ".png" or y_file.name.endswith(".tmp.png"): continue
                 hy = int(y_file.stem)
-                
                 lx, ly = hx // 2, hy // 2
                 if (lx, ly) in processed: continue
                 processed.add((lx, ly))
                 
-                # Merge 4 tiles
                 dest = Image.new("RGBA", (TILE_SIZE * 2, TILE_SIZE * 2), (0,0,0,0))
                 has_data = False
-                
                 for ox in (0, 1):
                     for oy in (0, 1):
                         src = high_dir / str(lx * 2 + ox) / f"{ly * 2 + oy}.png"
@@ -131,74 +129,55 @@ def build_pyramid(output_dir, z_max):
                             with Image.open(src) as tile:
                                 dest.paste(tile, (ox * TILE_SIZE, oy * TILE_SIZE))
                                 has_data = True
-                
                 if has_data:
                     out_x_dir = low_dir / str(lx)
                     out_x_dir.mkdir(parents=True, exist_ok=True)
-                    # Use Lanczos for best downscaling quality
-                    resized = dest.resize((TILE_SIZE, TILE_SIZE), Image.Resampling.LANCZOS)
+                    # Use NEAREST to maintain sharpness
+                    resized = dest.resize((TILE_SIZE, TILE_SIZE), Image.Resampling.NEAREST)
                     resized.save(out_x_dir / f"{ly}.png")
 
 def run_cycle(args):
-    """Main rendering cycle."""
     extent = get_world_extent(args.mapper, args.world, args.colors)
-    if not extent:
-        print("❌ Error: Could not get world extent.")
-        return
-    
-    left, bottom, width, height = extent
-    right = left + width
-    top = bottom + height
-    
-    print(f"[*] World Extent: L:{left} B:{bottom} R:{right} T:{top}")
+    if not extent: return
+    l, b, w, h = extent
     
     # Calculate tile range at MAX_ZOOM
-    tx_start, ty_end = game_to_tile(left, bottom, MAX_ZOOM)
-    tx_end, ty_start = game_to_tile(right, top, MAX_ZOOM)
+    z = args.zoom
+    tx_start, ty_start = mercator_to_tile(l, b + h, z) # Top-left
+    tx_end, ty_end = mercator_to_tile(l + w, b, z)     # Bottom-right
     
-    print(f"[*] Tile Grid: X[{tx_start} to {tx_end}] Y[{ty_start} to {ty_end}]")
+    print(f"[*] Cycle Start: Zoom {z} range X[{tx_start}-{tx_end}] Y[{ty_start}-{ty_end}]")
     
     tiles_dir = Path(args.output)
-    z_dir = tiles_dir / str(MAX_ZOOM)
+    z_dir = tiles_dir / str(z)
     
     count = 0
-    start_time = time.time()
-    
     for tx in range(tx_start, tx_end + 1):
         for ty in range(ty_start, ty_end + 1):
-            x_dir = z_dir / str(tx)
-            x_dir.mkdir(parents=True, exist_ok=True)
-            tile_path = x_dir / f"{ty}.png"
-            
-            # Simple optimization: Render every time for now (incremental logic can be added later)
-            if render_tile(args.mapper, args.world, args.colors, tx, ty, MAX_ZOOM, tile_path):
+            out_x_dir = z_dir / str(tx)
+            out_x_dir.mkdir(parents=True, exist_ok=True)
+            if render_tile(args.mapper, args.world, args.colors, tx, ty, z, out_x_dir / f"{ty}.png"):
                 count += 1
     
-    duration = time.time() - start_time
-    print(f"[*] Rendered {count} tiles at Zoom {MAX_ZOOM} in {duration:.1f}s.")
-    
-    if count > 0:
-        build_pyramid(args.output, MAX_ZOOM)
+    print(f"[*] Rendered {count} tiles.")
+    if count > 0: build_pyramid(args.output, z)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Precise Luanti-to-XYZ Tiler")
-    parser.add_argument("--world", required=True, help="Path to world directory")
-    parser.add_argument("--mapper", required=True, help="Path to minetestmapper executable")
-    parser.add_argument("--colors", required=True, help="Path to colors.txt")
-    parser.add_argument("--output", required=True, help="Output directory for tiles")
-    parser.add_argument("--daemon", action="store_true", help="Run in loop")
-    parser.add_argument("--interval", type=int, default=60, help="Interval in seconds")
-    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--world", required=True)
+    parser.add_argument("--mapper", required=True)
+    parser.add_argument("--colors", required=True)
+    parser.add_argument("--output", required=True)
+    parser.add_argument("--zoom", type=int, default=18)
+    parser.add_argument("--daemon", action="store_true")
+    parser.add_argument("--interval", type=int, default=30)
     args = parser.parse_args()
-    
     while True:
         try:
             run_cycle(args)
             if not args.daemon: break
-            print(f"[*] Sleeping {args.interval}s...")
             time.sleep(args.interval)
-        except KeyboardInterrupt:
-            break
+        except KeyboardInterrupt: break
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"Error: {e}")
             time.sleep(10)
