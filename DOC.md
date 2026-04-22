@@ -8,8 +8,8 @@ A comprehensive system for tracking and storing player positions from a Luanti (
 ## 1.1. Features
 
 - **Real-time Position Tracking**: Captures player positions every second via Luanti mod
-- **Auto Map Rendering**: Generates map images every 15 seconds
-- **HTTP Map Server**: Serves rendered maps via HTTP for QGIS integration
+- **Dynamic Map Tiling**: Generates XYZ tiles automatically using GDAL for any map size
+- **HTTP Tile Server**: CORS-enabled server reachable from external networks for QGIS
 - **PostgreSQL Database**: Robust data storage with spatial extensions
 - **One-Command Deployment**: Unified deployment script for production
 - **Auto-Archiving**: Intelligent data management with live/archive tables
@@ -66,21 +66,22 @@ luanti-position-tracker/
 │   └── deploy.sh              # Unified deployment script
 ├── src/
 │   ├── server.py              # Flask position tracker
-│   ├── range_server.py        # HTTP map server
 │   └── lib/
 │       └── common.sh          # Shared bash utilities
 ├── scripts/
 │   ├── setup/
 │   │   ├── postgresql.sh      # Database setup
 │   │   ├── mapper.sh          # Map renderer setup
+│   │   └── gdal.sh            # GDAL dependencies setup
 │   ├── server/
 │   │   ├── start-luanti.sh    # Start game server
 │   │   ├── migrate-backend.sh # Backend migration
 │   │   └── reset-env.sh       # Environment reset
 │   └── map/
-│       ├── render.sh          # Render map once  
-│       ├── auto-render.sh     # Auto-render loop
-│       └── setup-hosting.sh   # Setup map hosting
+│       ├── render.sh          # Render map and generate XYZ tiles
+│       ├── auto-render.sh     # Adaptive auto-render loop
+│       ├── serve-tiles.py     # CORS-enabled HTTP tile server
+│       └── setup-hosting.sh   # Setup map services
 ├── config/
 │   └── .env.example           # Configuration template
 ├── mod/
@@ -246,13 +247,13 @@ Three additional services are created automatically by the deployment:
 sudo systemctl status luanti-tracker-postgresql
 sudo systemctl restart luanti-tracker-postgresql
 
-# Map renderer (auto-render every 15s)
-sudo systemctl status luanti-map-render
-sudo systemctl restart luanti-map-render
+# Map renderer (auto-render and tiling)
+sudo systemctl status luanti-map-render@myworld
+sudo systemctl restart luanti-map-render@myworld
 
-# Map HTTP server (serves map.png - Port 8080)
-sudo systemctl status luanti-map-server
-sudo systemctl restart luanti-map-server
+# Map HTTP server (XYZ Tiles - Port 8080)
+sudo systemctl status luanti-map-server@myworld
+sudo systemctl restart luanti-map-server@myworld
 ```
 
 ## 1.9. API Endpoints
@@ -353,21 +354,17 @@ Each world automatically gets its own QGIS view when the mod loads:
 
 1. **Install QGIS**
 
-2. **Add Raster Layer (Map Background)**:
-   - Layer → Add Layer → Add Raster Layer
-   - Source: `http://<server-ip>:8080/map.png`
-   - Configure georeferencing with `map.pgw` world file
+2. **Add Map Background (XYZ Tiles)**:
+   - In Browser Panel, right-click **XYZ Tiles**
+   - New Connection Name: `Luanti Map`
+   - URL: `http://<server-ip>:8080/{z}/{x}/{y}.png`
+   - Add to map
 
 3. **Add PostGIS Layer (Player Positions)**:
    - Layer → Add Layer → Add PostGIS Layers
    - Create new connection to your PostgreSQL database
    - Select world-specific view (e.g., `view_live_positions_production`)
-   - Set as point layer
-
-4. **Style the Layer**:
-   - Right-click layer → Properties → Symbology
-   - Add labels with player names
-   - Style points as needed
+   - Style with player name labels
 
 **Example Multi-World Setup:**
 

@@ -39,8 +39,12 @@ fi
 print_info "Starting auto-render loop for world: $WORLD (interval: ${INTERVAL}s)"
 
 while true; do
-    print_info "Starting render..."
+    START_RENDER=$(date +%s)
+    print_info "Starting render and tile generation..."
     $RENDER_SCRIPT "$WORLD"
-    print_info "Sleeping ${INTERVAL}s..."
+    END_RENDER=$(date +%s)
+    RENDER_DURATION=$((END_RENDER - START_RENDER))
+    
+    print_info "Cycle complete (Process took ${RENDER_DURATION}s). Sleeping for ${INTERVAL}s..."
     sleep "$INTERVAL"
 done

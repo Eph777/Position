@@ -99,6 +99,40 @@ if [ $? -eq 0 ]; then
     echo "$ACTUAL_TOP" >> "$OUTPUT_WORLD_FILE"   # True Top-Left Y
     
     print_info "World file generated: $OUTPUT_WORLD_FILE"
+
+    # Step: Dynamic GDAL Tiling
+    TILES_DIR="$OUTPUT_DIR/tiles"
+    VRT_FILE="$OUTPUT_DIR/map.vrt"
+    
+    if command_exists gdal_translate; then
+        print_info "Generating XYZ Tiles (calculating dynamic zoom levels)..."
+        START_TIME=$(date +%s)
+        
+        # 1. Create VRT (Virtual Dataset) to apply .pgw georeferencing
+        gdal_translate -of VRT -a_srs EPSG:3857 "$OUTPUT_IMAGE" "$VRT_FILE" > /dev/null
+        
+        # 2. Generate Tiles
+        # We use --xyz to ensure standard XYZ format for QGIS
+        # We use --processes=4 as requested
+        # We use --profile=mercator for Web Mercator compatibility
+        GDAL_TILES_CMD="gdal2tiles.py"
+        if ! command_exists gdal2tiles.py; then
+            GDAL_TILES_CMD="gdal2tiles"
+        fi
+        
+        $GDAL_TILES_CMD --profile=mercator --processes=4 --xyz "$VRT_FILE" "$TILES_DIR" > /dev/null
+        
+        # Cleanup VRT
+        rm -f "$VRT_FILE"
+        
+        END_TIME=$(date +%s)
+        DURATION=$((END_TIME - START_TIME))
+        print_info "Tiles generated in ${DURATION}s."
+        print_info "Tiles location: $TILES_DIR"
+    else
+        print_warning "GDAL (gdal_translate) not found. Skipping tile generation."
+        print_info "Run scripts/setup/gdal.sh to enable dynamic tiling."
+    fi
 else
     print_error "Rendering failed!"
     exit 1

@@ -80,8 +80,8 @@ Description=Luanti Map HTTP Server - ${WORLD} (Port ${MAP_PORT})
 [Service]
 Type=simple
 User=${SERVICE_USER}
-WorkingDirectory=$MAP_OUTPUT_DIR
-ExecStart=/usr/bin/python3 $PROJECT_ROOT/src/range_server.py ${MAP_PORT}
+WorkingDirectory=$PROJECT_ROOT
+ExecStart=/usr/bin/python3 $PROJECT_ROOT/scripts/map/serve-tiles.py $MAP_OUTPUT_DIR/tiles --port ${MAP_PORT}
 Restart=always
 
 [Install]
@@ -101,7 +101,7 @@ sudo systemctl enable luanti-map-server@${WORLD}
 sudo systemctl start luanti-map-server@${WORLD}
 
 print_info "Map services started successfully!"
-echo "Map is now hosted at: http://$(hostname -I | awk '{print $1}'):${MAP_PORT}/map.png"
+echo "QGIS XYZ Connection: http://$(hostname -I | awk '{print $1}'):${MAP_PORT}/{z}/{x}/{y}.png"
 echo ""
 print_info "Service Management Commands:"
 echo "  Status:  sudo systemctl status luanti-map-render@${WORLD}"

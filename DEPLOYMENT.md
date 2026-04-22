@@ -29,6 +29,7 @@ The deployment script will automatically install:
 - Python 3.8+
 - Luanti game server (via Snap)
 - Build tools for map renderer
+- GDAL (gdal-bin, python3-gdal) for XYZ tiling
 
 ## Quick Start
 
@@ -106,10 +107,17 @@ Compiles and installs minetestmapper:
 
 ### Step 4: Map Hosting
 
-Sets up auto-rendering service and HTTP server:
+Sets up auto-rendering service (including GDAL tiling) and HTTP tile server:
 
 ```bash
-./scripts/map/setup-hosting.sh myworld
+# Setup hosting for a specific world on a specific port
+./scripts/map/setup-hosting.sh myworld 8080
+```
+
+**Manual GDAL Setup** (if needed):
+
+```bash
+./scripts/setup/gdal.sh
 ```
 
 ## Configuration
@@ -181,8 +189,8 @@ MAP_RENDER_INTERVAL=15
 The deployment creates three systemd services:
 
 1. **luanti-tracker-postgresql**: Flask position tracking server
-2. **luanti-map-render**: Auto-renders maps every 15 seconds
-3. **luanti-map-server**: HTTP server for map.png
+2. **luanti-map-render@<world>**: Auto-renders maps and generates XYZ tiles
+3. **luanti-map-server@<world>**: CORS-enabled HTTP server for XYZ tiles ({z}/{x}/{y}.png)
 
 ### Service Commands
 
@@ -313,13 +321,27 @@ pip list | grep psycopg2
 # Check mapper executable
 ls -la ~/minetest-mapper/minetestmapper
 
-# Check map render service
-sudo systemctl status luanti-map-render
-sudo journalctl -u luanti-map-render -n 50
+# Check GDAL installation
+gdal_translate --version
+python3 -c "from osgeo import gdal"
 
-# Test manual render
+# Check map render service
+sudo systemctl status luanti-map-render@myworld
+sudo journalctl -u luanti-map-render@myworld -n 50
+
+# Test manual render (includes tiling)
 ./scripts/map/render.sh myworld
 ```
+
+#### 5. Connecting QGIS to XYZ Tiles
+
+Instead of adding a "Raster Layer", use the **XYZ Tiles** provider:
+
+1. Open QGIS.
+2. In the **Browser Panel**, right-click **XYZ Tiles** -> **New Connection...**.
+3. **Name**: Luanti Map
+4. **URL**: `http://<YOUR_SERVER_IP>:8080/{z}/{x}/{y}.png`
+5. Click **OK** and drag the layer onto the map map.
 
 ## Backup and Restore
 
