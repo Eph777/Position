@@ -122,7 +122,16 @@ else
     echo "listen_addresses = '*'" | sudo tee -a "$PG_CONF_FILE"
 fi
 
-# Restart PostgreSQL to apply changes (listen_addresses requires restart, not just reload)
+# Force standard port 5432 (Ubuntu may default to 5433)
+print_info "Configuring PostgreSQL to use standard port 5432..."
+sudo sed -i '/^port/d' "$PG_CONF_FILE"
+if grep -q "^#.*port" "$PG_CONF_FILE"; then
+    sudo sed -i '0,/^#.*port.*/s//port = 5432/' "$PG_CONF_FILE"
+else
+    echo "port = 5432" | sudo tee -a "$PG_CONF_FILE"
+fi
+
+# Restart PostgreSQL to apply changes (listen_addresses and port require restart)
 sudo systemctl restart postgresql
 # Wait for PostgreSQL to be ready for TCP connections
 sleep 2
@@ -201,7 +210,7 @@ fi
 
 # Import database schema
 print_info "Importing database schema..."
-PGPASSWORD=${DB_PASS} psql -U ${DB_USER} -d ${DB_NAME} -f schema.sql
+PGPASSWORD=${DB_PASS} psql -h 127.0.0.1 -p ${DB_PORT} -U ${DB_USER} -d ${DB_NAME} -f schema.sql
 
 print_info "Python application setup complete!"
 
@@ -278,7 +287,7 @@ print_info "Systemd service created and started!"
 print_info "Step 8/9: Configuring firewall..."
 sudo ufw allow OpenSSH
 sudo ufw allow 5000/tcp
-sudo ufw allow 5432/tcp
+sudo ufw allow ${DB_PORT}/tcp
 sudo ufw allow 30000/udp
 sudo ufw allow 30001/udp
 sudo ufw allow 30002/udp
