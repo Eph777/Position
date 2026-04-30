@@ -108,7 +108,9 @@ if [ "$STATUS_ONLY" = true ]; then
     
     echo ""
     print_info "Database Status:"
+    pushd /tmp > /dev/null
     sudo -u postgres psql -c "\l" | grep luanti_db || echo "  Database luanti_db: Not found"
+    popd > /dev/null
     
     exit 0
 fi

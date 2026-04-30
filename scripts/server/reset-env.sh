@@ -112,10 +112,12 @@ fi
 
 print_info "Cleaning up Global PostgreSQL (Legacy)..."
 # Attempt to drop legacy global DB/User just in case
+pushd /tmp > /dev/null
 sudo -u postgres psql <<EOF 2>/dev/null || true
 DROP DATABASE IF EXISTS luanti_db;
 DROP USER IF EXISTS luanti;
 EOF
+popd > /dev/null
 
 print_info "Cleanup complete! Environment is reset."
 print_info "You can now run './bin/deploy.sh' to start fresh."
