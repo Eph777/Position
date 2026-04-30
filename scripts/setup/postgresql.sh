@@ -113,15 +113,19 @@ fi
 # Configure postgresql.conf to listen on all addresses
 print_info "Configuring postgresql.conf to listen on all addresses..."
 sudo cp "$PG_CONF_FILE" "${PG_CONF_FILE}.backup"
-if grep -q "^listen_addresses" "$PG_CONF_FILE"; then
-    sudo sed -i "s/^listen_addresses = .*/listen_addresses = '*'/" "$PG_CONF_FILE"
+# Remove any previously appended listen_addresses lines (from prior runs)
+sudo sed -i '/^listen_addresses/d' "$PG_CONF_FILE"
+# Uncomment and set the default commented-out line, or add it if missing entirely
+if grep -q "^#.*listen_addresses" "$PG_CONF_FILE"; then
+    sudo sed -i "s/^#.*listen_addresses.*/listen_addresses = '*'/" "$PG_CONF_FILE"
 else
     echo "listen_addresses = '*'" | sudo tee -a "$PG_CONF_FILE"
 fi
 
-# Reload PostgreSQL to apply changes
+# Restart PostgreSQL to apply changes (listen_addresses requires restart, not just reload)
 sudo systemctl restart postgresql
-sudo systemctl reload postgresql
+# Wait for PostgreSQL to be ready for TCP connections
+sleep 2
 
 print_info "PostgreSQL authentication configured!"
 
