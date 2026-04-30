@@ -92,8 +92,10 @@ print_info "Step 4/9: Configuring PostgreSQL..."
 
 # Configure authentication method
 print_info "Configuring PostgreSQL authentication..."
+pushd /tmp > /dev/null
 PG_HBA_CONF=$(sudo -u postgres psql -t -P format=unaligned -c 'SHOW hba_file;')
 PG_CONF_FILE=$(sudo -u postgres psql -t -P format=unaligned -c 'SHOW config_file;')
+popd > /dev/null
 print_info "PostgreSQL pg_hba.conf file: $PG_HBA_CONF"
 print_info "PostgreSQL postgresql.conf file: $PG_CONF_FILE"
 
@@ -129,6 +131,7 @@ print_info "Creating database and user..."
 # Stop service to ensure no active DB connections prevent the drop
 sudo systemctl stop luanti-tracker-postgresql 2>/dev/null || true
 
+pushd /tmp > /dev/null
 sudo -u postgres psql <<EOF
 -- Ensure password is hashed with SCRAM-SHA-256 to match pg_hba.conf
 SET password_encryption = 'scram-sha-256';
@@ -155,6 +158,7 @@ ALTER VIEW IF EXISTS view_live_positions OWNER TO ${DB_USER};
 ALTER SEQUENCE IF EXISTS player_traces_id_seq OWNER TO ${DB_USER};
 ALTER SEQUENCE IF EXISTS player_traces_archive_id_seq OWNER TO ${DB_USER};
 EOF
+popd > /dev/null
 
 print_info "PostgreSQL configuration complete!"
 
