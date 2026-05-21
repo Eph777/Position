@@ -77,6 +77,129 @@ def enable_mod_in_world(world_mt_path, mod_name):
         f.writelines(lines)
     print(f"  -> Activated mod '{mod_name}' in world.mt")
 
+def is_mod_enabled(world_mt_path, mod_name):
+    if not os.path.exists(world_mt_path):
+        return False
+    try:
+        with open(world_mt_path, 'r') as f:
+            for line in f:
+                if re.match(rf"^load_mod_{mod_name}\s*=\s*true", line):
+                    return True
+    except Exception:
+        pass
+    return False
+
+def disable_mod_in_world(world_mt_path, mod_name):
+    if not os.path.exists(world_mt_path):
+        print(f"Warning: world.mt not found at {world_mt_path}. Cannot auto-disable.")
+        return
+    
+    # Read existing world.mt lines
+    with open(world_mt_path, 'r') as f:
+        lines = f.readlines()
+        
+    # Remove any existing config line for this mod
+    pattern = re.compile(rf"^load_mod_{mod_name}\s*=")
+    lines = [line for line in lines if not pattern.match(line)]
+    
+    # Write back and append disabled flag
+    lines.append(f"load_mod_{mod_name} = false\n")
+    with open(world_mt_path, 'w') as f:
+        f.writelines(lines)
+    print(f"  -> Deactivated mod '{mod_name}' in world.mt")
+
+def check_status(mod_name, mods_dir, world_mt_path):
+    target_dir = os.path.join(mods_dir, mod_name)
+    if not os.path.exists(target_dir):
+        print(f"error:{mod_name}:not_found")
+        return
+        
+    mods_in_package, is_modpack = get_installed_mods(target_dir)
+    
+    if is_modpack:
+        # Check if any submod is enabled
+        any_enabled = False
+        submod_infos = []
+        for m in mods_in_package:
+            enabled = is_mod_enabled(world_mt_path, m)
+            if enabled:
+                any_enabled = True
+            submod_infos.append((m, "enabled" if enabled else "disabled"))
+            
+        print(f"modpack:{mod_name}:{'enabled' if any_enabled else 'disabled'}")
+        for sm_name, sm_status in submod_infos:
+            print(f"submod:{sm_name}:{sm_status}")
+    else:
+        enabled = is_mod_enabled(world_mt_path, mod_name)
+        print(f"mod:{mod_name}:{'enabled' if enabled else 'disabled'}")
+
+def toggle_mod(mod_name, mods_dir, world_mt_path):
+    target_dir = os.path.join(mods_dir, mod_name)
+    if not os.path.exists(target_dir):
+        print(f"Error: Mod directory '{mod_name}' not found in {mods_dir}")
+        sys.exit(1)
+        
+    mods_in_package, is_modpack = get_installed_mods(target_dir)
+    
+    # Determine if the mod/modpack is currently enabled
+    # For a modpack, it is enabled if at least one submod is enabled
+    any_enabled = False
+    for m in mods_in_package:
+        if is_mod_enabled(world_mt_path, m):
+            any_enabled = True
+            break
+            
+    if any_enabled:
+        # Disable all
+        print(f"Deactivating mod/modpack '{mod_name}'...")
+        if is_modpack:
+            remove_mod_from_world(world_mt_path, mod_name)
+        for m in mods_in_package:
+            disable_mod_in_world(world_mt_path, m)
+    else:
+        # Enable all
+        print(f"Activating mod/modpack '{mod_name}'...")
+        if is_modpack:
+            remove_mod_from_world(world_mt_path, mod_name)
+        for m in mods_in_package:
+            enable_mod_in_world(world_mt_path, m)
+            
+        # Check for missing dependencies (only when enabling)
+        local_mod_names = set(mods_in_package) if is_modpack else {mod_name}
+        all_deps = set()
+        
+        if is_modpack:
+            for entry in os.listdir(target_dir):
+                subdir = os.path.join(target_dir, entry)
+                if os.path.isdir(subdir):
+                    if os.path.exists(os.path.join(subdir, "mod.conf")) or os.path.exists(os.path.join(subdir, "init.lua")):
+                        all_deps.update(get_local_dependencies(subdir))
+        else:
+            all_deps.update(get_local_dependencies(target_dir))
+            
+        missing_deps = set()
+        for dep in all_deps:
+            if dep in IGNORED_MODS or dep in local_mod_names:
+                continue
+                
+            installed = False
+            if os.path.exists(os.path.join(mods_dir, dep)):
+                installed = True
+            else:
+                for d in os.listdir(mods_dir):
+                    parent_dir = os.path.join(mods_dir, d)
+                    if os.path.isdir(parent_dir):
+                        submods, _ = get_installed_mods(parent_dir)
+                        if dep in submods:
+                            installed = True
+                            break
+            if not installed:
+                missing_deps.add(dep)
+                
+        if missing_deps:
+            print(f"\nWARNING: Mod '{mod_name}' depends on the following missing mod(s): {', '.join(sorted(missing_deps))}")
+            print("Please ensure they are installed before starting the server.")
+
 def get_mod_name_from_conf(conf_path):
     if not os.path.exists(conf_path):
         return None
@@ -467,6 +590,8 @@ def main():
     parser.add_argument("--mods-dir", required=True, help="Path to the Luanti mods/ directory")
     parser.add_argument("--world-mt", help="Path to world.mt file to auto-enable mods")
     parser.add_argument("--enable-only", help="Only enable/activate the specified already-installed mod name in world.mt (including sub-mods if it is a modpack)")
+    parser.add_argument("--toggle", help="Toggle the activation status of the specified mod/modpack in world.mt")
+    parser.add_argument("--check-status", help="Print the details and activation status of the specified mod/modpack and its submods")
     
     args = parser.parse_args()
     
@@ -479,8 +604,17 @@ def main():
         print(f"\nMod '{args.enable_only}' activation complete!")
         sys.exit(0)
         
+    if args.toggle:
+        toggle_mod(args.toggle, args.mods_dir, args.world_mt)
+        print(f"\nMod '{args.toggle}' status update complete!")
+        sys.exit(0)
+
+    if args.check_status:
+        check_status(args.check_status, args.mods_dir, args.world_mt)
+        sys.exit(0)
+
     if not args.input:
-        parser.error("the following arguments are required: input (unless --enable-only is specified)")
+        parser.error("the following arguments are required: input (unless --enable-only, --toggle, or --check-status is specified)")
         
     # Check if input is a local ZIP file
     if os.path.isfile(args.input) and (args.input.endswith(".zip") or zipfile.is_zipfile(args.input)):

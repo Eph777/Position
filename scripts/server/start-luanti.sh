@@ -287,11 +287,50 @@ if [[ "$INTERACTIVE" == true ]]; then
         done
         for i in "${!installed_mods[@]}"; do
             mod_name="${installed_mods[$i]}"
+            
+            SCRIPT="$PROJECT_ROOT/scripts/server/install-mod.py"
+            submods=()
+            submod_statuses=()
+            is_modpack=false
+            mod_enabled=false
+            
+            while IFS=: read -r type name status; do
+                if [ "$type" = "mod" ]; then
+                    if [ "$status" = "enabled" ]; then
+                        mod_enabled=true
+                    fi
+                elif [ "$type" = "modpack" ]; then
+                    is_modpack=true
+                    if [ "$status" = "enabled" ]; then
+                        mod_enabled=true
+                    fi
+                elif [ "$type" = "submod" ]; then
+                    submods+=("$name")
+                    if [ "$status" = "enabled" ]; then
+                        submod_statuses+=("[ENABLED]")
+                    else
+                        submod_statuses+=("[DISABLED]")
+                    fi
+                fi
+            done < <(python3 "$SCRIPT" --check-status "$mod_name" --mods-dir "$MODS_DIR" --world-mt "$WORLD_MT")
+            
             status_tag="[INSTALLED]"
-            if grep -q "^load_mod_${mod_name}[ =]*true" "$WORLD_MT" 2>/dev/null; then
+            if [ "$mod_enabled" = true ]; then
                 status_tag="[INSTALLED] [ENABLED]"
             fi
+            
             echo "[$((i + 1 + zip_count))] $status_tag $mod_name"
+            
+            if [ "$is_modpack" = true ]; then
+                submod_count=${#submods[@]}
+                for ((j=0; j<submod_count; j++)); do
+                    prefix="    ├──"
+                    if [ "$j" -eq "$((submod_count - 1))" ]; then
+                        prefix="    └──"
+                    fi
+                    echo "$prefix ${submod_statuses[$j]} ${submods[$j]}"
+                done
+            fi
         done
         
         read -p "your choice : " -r CHOICE
@@ -336,9 +375,9 @@ if [[ "$INTERACTIVE" == true ]]; then
             MOD_INDEX=$((CHOICE - 1 - zip_count))
             SELECTED_MOD="${installed_mods[$MOD_INDEX]}"
             
-            print_info "Activating installed mod '$SELECTED_MOD'..."
+            print_info "Toggling activation for installed mod '$SELECTED_MOD'..."
             SCRIPT="$PROJECT_ROOT/scripts/server/install-mod.py"
-            python3 "$SCRIPT" --enable-only "$SELECTED_MOD" --mods-dir "$MODS_DIR" --world-mt "$WORLD_MT"
+            python3 "$SCRIPT" --toggle "$SELECTED_MOD" --mods-dir "$MODS_DIR" --world-mt "$WORLD_MT"
             echo
             continue
         fi
