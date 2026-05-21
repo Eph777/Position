@@ -24,6 +24,8 @@
 PROJECT_ROOT=$(cat /root/.proj_root)
 source $PROJECT_ROOT/src/lib/common.sh
 
+/scripts/server
+
 # Defaults
 WORLD=""
 PORT=30000
@@ -318,8 +320,8 @@ if [[ "$INTERACTIVE" == true ]]; then
             fi
             
             print_info "Running recursive dependency installer..."
-            SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-            python3 "$SCRIPT_DIR/install-mod.py" "$MOD_INPUT" --mods-dir "$MODS_DIR" --world-mt "$WORLD_MT"
+            SCRIPT="$PROJECT_ROOT/scripts/server/install-mod.py"
+            python3 "$SCRIPT" "$MOD_INPUT" --mods-dir "$MODS_DIR" --world-mt "$WORLD_MT"
             echo
             continue
         elif [[ "$CHOICE" -le "$zip_count" ]]; then
