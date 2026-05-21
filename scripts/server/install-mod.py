@@ -5,6 +5,7 @@ import json
 import re
 import urllib.request
 import urllib.error
+import urllib.parse
 import tempfile
 import zipfile
 import shutil
@@ -256,11 +257,216 @@ def resolve_and_install(initial_package_id, mods_dir, world_mt_path):
         if installed_name:
             installed_packages.add(current_pkg)
 
+def get_local_dependencies(mod_dir):
+    deps = set()
+    
+    # 1. Check mod.conf
+    mod_conf_path = os.path.join(mod_dir, "mod.conf")
+    if os.path.exists(mod_conf_path):
+        try:
+            with open(mod_conf_path, 'r', encoding='utf-8', errors='ignore') as f:
+                for line in f:
+                    line = line.split('#')[0].strip()
+                    if '=' in line:
+                        key, val = line.split('=', 1)
+                        if key.strip().lower() == 'depends':
+                            for dep in val.split(','):
+                                dep = dep.strip()
+                                if dep:
+                                    deps.add(dep)
+        except Exception as e:
+            print(f"Warning: failed to read config file {mod_conf_path}: {e}")
+            
+    # 2. Check depends.txt (legacy)
+    depends_txt_path = os.path.join(mod_dir, "depends.txt")
+    if os.path.exists(depends_txt_path):
+        try:
+            with open(depends_txt_path, 'r', encoding='utf-8', errors='ignore') as f:
+                for line in f:
+                    line = line.split('#')[0].strip()
+                    if line:
+                        if line.endswith('?'):
+                            continue
+                        deps.add(line)
+        except Exception as e:
+            print(f"Warning: failed to read depends.txt {depends_txt_path}: {e}")
+            
+    return sorted(list(deps))
+
+def search_contentdb_for_mod(dep_name):
+    url = f"https://content.minetest.net/api/packages/?q={urllib.parse.quote(dep_name)}&type=mod"
+    packages = fetch_json(url)
+    if not packages:
+        return None
+    for pkg in packages:
+        if pkg.get("name") == dep_name:
+            return f"{pkg.get('author')}/{pkg.get('name')}"
+    return None
+
+def resolve_dependencies_for_local_mods(mods_list, target_dir, mods_dir, world_mt_path):
+    all_deps = set()
+    local_mod_names = set(mods_list)
+    
+    # If it is a modpack, we check its sub-directories
+    is_modpack = os.path.exists(os.path.join(target_dir, "modpack.conf")) or os.path.exists(os.path.join(target_dir, "modpack.txt"))
+    if is_modpack:
+        for entry in os.listdir(target_dir):
+            subdir = os.path.join(target_dir, entry)
+            if os.path.isdir(subdir):
+                if os.path.exists(os.path.join(subdir, "mod.conf")) or os.path.exists(os.path.join(subdir, "init.lua")):
+                    all_deps.update(get_local_dependencies(subdir))
+    else:
+        all_deps.update(get_local_dependencies(target_dir))
+        
+    unresolved_deps = []
+    for dep in all_deps:
+        if dep in IGNORED_MODS or dep in local_mod_names:
+            continue
+            
+        # Check if already installed
+        installed = False
+        if os.path.exists(os.path.join(mods_dir, dep)):
+            installed = True
+        else:
+            # Check all installed folders to see if any sub-mod has this name
+            for d in os.listdir(mods_dir):
+                parent_dir = os.path.join(mods_dir, d)
+                if os.path.isdir(parent_dir):
+                    submods, _ = get_installed_mods(parent_dir)
+                    if dep in submods:
+                        installed = True
+                        break
+        if not installed:
+            unresolved_deps.append(dep)
+            
+    for dep in unresolved_deps:
+        print(f"Resolving missing dependency: {dep}")
+        package_id = search_contentdb_for_mod(dep)
+        if package_id:
+            print(f"  -> Found package '{package_id}' on ContentDB. Installing...")
+            resolve_and_install(package_id, mods_dir, world_mt_path)
+        else:
+            print(f"  -> Warning: Could not find package on ContentDB for dependency '{dep}'")
+
+def install_local_zip(zip_path, mods_dir, world_mt_path):
+    if not os.path.exists(zip_path):
+        print(f"Error: Local zip file '{zip_path}' not found.")
+        sys.exit(1)
+        
+    print(f"Installing local mod archive: {os.path.basename(zip_path)}...")
+    
+    extract_dir = tempfile.mkdtemp()
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(extract_dir)
+            
+        mod_root = None
+        for root, dirs, files in os.walk(extract_dir):
+            if any(f in ["modpack.conf", "modpack.txt", "mod.conf", "init.lua"] for f in files):
+                mod_root = root
+                break
+                
+        if not mod_root:
+            subdirs = [os.path.join(extract_dir, d) for d in os.listdir(extract_dir) if os.path.isdir(os.path.join(extract_dir, d))]
+            if subdirs:
+                mod_root = subdirs[0]
+                
+        if not mod_root:
+            print(f"Error: No mod directory found in ZIP.")
+            return None
+            
+        mod_name = os.path.basename(mod_root)
+        if mod_root == extract_dir:
+            mod_name = os.path.splitext(os.path.basename(zip_path))[0]
+            
+        clean_mod_name = re.sub(r'-[0-9a-fA-F]+$|-master$', '', mod_name)
+        target_dir = os.path.join(mods_dir, clean_mod_name)
+        
+        if mod_root == extract_dir:
+            if os.path.exists(target_dir):
+                print(f"  -> Overwriting existing mod '{clean_mod_name}' files...")
+                shutil.rmtree(target_dir)
+            os.makedirs(target_dir, exist_ok=True)
+            for entry in os.listdir(extract_dir):
+                shutil.move(os.path.join(extract_dir, entry), os.path.join(target_dir, entry))
+        else:
+            if os.path.exists(target_dir):
+                print(f"  -> Overwriting existing mod '{clean_mod_name}' files...")
+                shutil.rmtree(target_dir)
+            shutil.move(mod_root, target_dir)
+            
+        print(f"  -> Installed mod '{clean_mod_name}' to {target_dir}")
+        
+        mods_to_enable, is_modpack = get_installed_mods(target_dir)
+        if is_modpack:
+            remove_mod_from_world(world_mt_path, clean_mod_name)
+        for m in mods_to_enable:
+            enable_mod_in_world(world_mt_path, m)
+            
+        resolve_dependencies_for_local_mods(mods_to_enable, target_dir, mods_dir, world_mt_path)
+        
+        return clean_mod_name
+    finally:
+        if os.path.exists(extract_dir):
+            shutil.rmtree(extract_dir)
+
+def enable_only(mod_name, mods_dir, world_mt_path):
+    target_dir = os.path.join(mods_dir, mod_name)
+    if not os.path.exists(target_dir):
+        print(f"Error: Mod directory '{mod_name}' not found in {mods_dir}")
+        sys.exit(1)
+        
+    mods_to_enable, is_modpack = get_installed_mods(target_dir)
+    
+    if is_modpack:
+        remove_mod_from_world(world_mt_path, mod_name)
+        
+    for m in mods_to_enable:
+        enable_mod_in_world(world_mt_path, m)
+        
+    # Check for missing dependencies
+    local_mod_names = set(mods_to_enable) if is_modpack else {mod_name}
+    all_deps = set()
+    
+    if is_modpack:
+        for entry in os.listdir(target_dir):
+            subdir = os.path.join(target_dir, entry)
+            if os.path.isdir(subdir):
+                if os.path.exists(os.path.join(subdir, "mod.conf")) or os.path.exists(os.path.join(subdir, "init.lua")):
+                    all_deps.update(get_local_dependencies(subdir))
+    else:
+        all_deps.update(get_local_dependencies(target_dir))
+        
+    missing_deps = set()
+    for dep in all_deps:
+        if dep in IGNORED_MODS or dep in local_mod_names:
+            continue
+            
+        # Check if installed
+        installed = False
+        if os.path.exists(os.path.join(mods_dir, dep)):
+            installed = True
+        else:
+            for d in os.listdir(mods_dir):
+                parent_dir = os.path.join(mods_dir, d)
+                if os.path.isdir(parent_dir):
+                    submods, _ = get_installed_mods(parent_dir)
+                    if dep in submods:
+                        installed = True
+                        break
+        if not installed:
+            missing_deps.add(dep)
+            
+    if missing_deps:
+        print(f"\nWARNING: Mod '{mod_name}' depends on the following missing mod(s): {', '.join(sorted(missing_deps))}")
+        print("Please ensure they are installed before starting the server.")
+
 def main():
-    parser = argparse.ArgumentParser(description="Recursively install Luanti mods and dependencies from ContentDB.")
-    parser.add_argument("input", help="ContentDB Package page URL or 'author/name'")
+    parser = argparse.ArgumentParser(description="Recursively install Luanti mods and dependencies from ContentDB or local zip.")
+    parser.add_argument("input", nargs="?", help="ContentDB Package page URL, 'author/name', or local ZIP file path")
     parser.add_argument("--mods-dir", required=True, help="Path to the Luanti mods/ directory")
     parser.add_argument("--world-mt", help="Path to world.mt file to auto-enable mods")
+    parser.add_argument("--enable-only", help="Only enable/activate the specified already-installed mod name in world.mt (including sub-mods if it is a modpack)")
     
     args = parser.parse_args()
     
@@ -268,9 +474,23 @@ def main():
     if not os.path.exists(args.mods_dir):
         os.makedirs(args.mods_dir, exist_ok=True)
         
+    if args.enable_only:
+        enable_only(args.enable_only, args.mods_dir, args.world_mt)
+        print(f"\nMod '{args.enable_only}' activation complete!")
+        sys.exit(0)
+        
+    if not args.input:
+        parser.error("the following arguments are required: input (unless --enable-only is specified)")
+        
+    # Check if input is a local ZIP file
+    if os.path.isfile(args.input) and (args.input.endswith(".zip") or zipfile.is_zipfile(args.input)):
+        install_local_zip(args.input, args.mods_dir, args.world_mt)
+        print("\nLocal mod installation and dependency resolution complete!")
+        sys.exit(0)
+        
     package_id = parse_package_id(args.input)
     if not package_id:
-        print("Error: Input must be a valid ContentDB URL or formatted as 'author/name'", file=sys.stderr)
+        print("Error: Input must be a valid ContentDB URL, 'author/name', or a path to a local zip file.", file=sys.stderr)
         sys.exit(1)
         
     print(f"Target Mod ID detected: {package_id}")
