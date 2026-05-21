@@ -305,26 +305,25 @@ if [[ "$INTERACTIVE" == true ]]; then
             continue
         fi
 
-        TEMP_ZIP=$(mktemp)
         DOWNLOAD_SUCCESS=false
+        TEMP_ZIP=""
 
         if [[ "$CHOICE" -eq 0 ]]; then
-            echo "Please provide the direct .zip download link of the mod:"
-            read -p "URL ==> " -r MOD_INPUT
+            echo "Please provide the ContentDB URL or package ID (author/name):"
+            read -p "URL or ID ==> " -r MOD_INPUT
             
             if [[ -z "$MOD_INPUT" ]]; then
-                print_error "No URL provided."
-                rm -f "$TEMP_ZIP"
+                print_error "No URL or ID provided."
                 continue
             fi
             
-            print_info "Downloading mod from URL..."
-            if curl -sL "$MOD_INPUT" -o "$TEMP_ZIP"; then
-                DOWNLOAD_SUCCESS=true
-            else
-                print_error "Failed to download the mod."
-            fi
+            print_info "Running recursive dependency installer..."
+            SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+            python3 "$SCRIPT_DIR/install-mod.py" "$MOD_INPUT" --mods-dir "$MODS_DIR" --world-mt "$WORLD_MT"
+            echo
+            continue
         elif [[ "$CHOICE" -le "$zip_count" ]]; then
+            TEMP_ZIP=$(mktemp)
             FILE_INDEX=$((CHOICE - 1))
             LOCAL_FILE="${local_zips[$FILE_INDEX]}"
             print_info "Using local mod archive: $(basename "$LOCAL_FILE")"
@@ -338,7 +337,6 @@ if [[ "$INTERACTIVE" == true ]]; then
                 read -p "Mod '$SELECTED_MOD' is already configured in world.mt. Overwrite and activate? (y/n) " -n 1 -r
                 echo
                 if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
-                    rm -f "$TEMP_ZIP"
                     echo
                     continue
                 fi
@@ -356,7 +354,6 @@ if [[ "$INTERACTIVE" == true ]]; then
                 fi
             fi
             
-            rm -f "$TEMP_ZIP"
             echo
             continue
         fi
