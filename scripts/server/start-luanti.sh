@@ -33,6 +33,7 @@ IS_SERVICE=false
 MAP_PORT=""
 INTERACTIVE=false
 GAME_ID="minetest_game"
+MAP_RENDER_INTERVAL=15
 
 # Parse Positional Arguments
 # Check if current First argument is existent and NOT a flag
@@ -51,12 +52,13 @@ fi
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --help)
-            echo "Usage: $0 [-i|--interactive] <world_name> [port] [--service] [--map MAP_PORT]"
+            echo "Usage: $0 [-i|--interactive] <world_name> [port] [--service] [--map MAP_PORT] [--map-interval INTERVAL]"
             echo "  -i, --interactive        Run in interactive mode"
             echo "  <world_name>             Name of the world folder (Required unless interactive)"
             echo "  [port]                   UDP Port for game server (Default: 30000)"
             echo "  --service                Create and start as systemd service"
             echo "  --map PORT               Also start map hosting on TCP PORT"
+            echo "  --map-interval INTERVAL  Map render interval in seconds (Default: 15)"
             exit 0
             ;;
         -i|--interactive)
@@ -81,6 +83,14 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             MAP_PORT="$2"
+            shift 2
+            ;;
+        --map-interval)
+            if [[ -z "$2" || "$2" == -* || ! "$2" =~ ^[0-9]+$ ]]; then
+                echo "Error: --map-interval requires a positive integer argument (seconds)"
+                exit 1
+            fi
+            MAP_RENDER_INTERVAL="$2"
             shift 2
             ;;
         *)
@@ -197,6 +207,11 @@ if [[ "$INTERACTIVE" == true ]]; then
 
     read -p "map hosting port (default: ${MAP_PORT:-none}) : " -r
     if [[ -n "$REPLY" ]]; then MAP_PORT="$REPLY"; fi
+
+    if [[ -n "$MAP_PORT" ]]; then
+        read -p "map render interval in seconds (default: $MAP_RENDER_INTERVAL) : " -r
+        if [[ -n "$REPLY" ]]; then MAP_RENDER_INTERVAL="$REPLY"; fi
+    fi
 
     curr_svc="n"
     if [ "$IS_SERVICE" = true ]; then curr_svc="y"; fi
@@ -401,7 +416,7 @@ if [ -n "$MAP_PORT" ]; then
     
     # Run map hosting setup script
     print_info "Configuring Mapserver..."
-    "$PROJECT_ROOT/scripts/map/setup-hosting.sh" "$WORLD" "$MAP_PORT" || {
+    "$PROJECT_ROOT/scripts/map/setup-hosting.sh" "$WORLD" "$MAP_PORT" "$MAP_RENDER_INTERVAL"|| {
         print_error "Failed to setup map services"
         exit 1
     }
