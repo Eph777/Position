@@ -45,7 +45,7 @@ if [[ "$EXTENT_STR" =~ ([-0-9]+):([-0-9]+)\+([0-9]+)\+([0-9]+) ]]; then
     ACTUAL_BOTTOM="${BASH_REMATCH[2]}"
     ACTUAL_WIDTH="${BASH_REMATCH[3]}"
     ACTUAL_HEIGHT="${BASH_REMATCH[4]}"
-    ACTUAL_TOP=$((ACTUAL_BOTTOM + ACTUAL_HEIGHT))
+    ACTUAL_TOP=$((ACTUAL_BOTTOM + ACTUAL_HEIGHT - 1))
     
     # For reliable georeferencing without cropping issues, we map the exact known bounds
     GEOM_ARG="--geometry $ACTUAL_LEFT:$ACTUAL_BOTTOM+$ACTUAL_WIDTH+$ACTUAL_HEIGHT"

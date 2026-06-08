@@ -104,7 +104,7 @@ minetest.register_globalstep(function(dtime)
                 pos = {
                     x = pos.x,
                     y = pos.y,
-                    z = pos.z+1
+                    z = pos.z
                 }
             })
         end
