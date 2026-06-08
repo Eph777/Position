@@ -24,6 +24,8 @@
 PROJECT_ROOT=$(cat /root/.proj_root)
 source $PROJECT_ROOT/src/lib/common.sh
 
+/scripts/server
+
 # Defaults
 WORLD=""
 PORT=30000
@@ -285,11 +287,50 @@ if [[ "$INTERACTIVE" == true ]]; then
         done
         for i in "${!installed_mods[@]}"; do
             mod_name="${installed_mods[$i]}"
+            
+            SCRIPT="$PROJECT_ROOT/scripts/server/install-mod.py"
+            submods=()
+            submod_statuses=()
+            is_modpack=false
+            mod_enabled=false
+            
+            while IFS=: read -r type name status; do
+                if [ "$type" = "mod" ]; then
+                    if [ "$status" = "enabled" ]; then
+                        mod_enabled=true
+                    fi
+                elif [ "$type" = "modpack" ]; then
+                    is_modpack=true
+                    if [ "$status" = "enabled" ]; then
+                        mod_enabled=true
+                    fi
+                elif [ "$type" = "submod" ]; then
+                    submods+=("$name")
+                    if [ "$status" = "enabled" ]; then
+                        submod_statuses+=("[ENABLED]")
+                    else
+                        submod_statuses+=("[DISABLED]")
+                    fi
+                fi
+            done < <(python3 "$SCRIPT" --check-status "$mod_name" --mods-dir "$MODS_DIR" --world-mt "$WORLD_MT")
+            
             status_tag="[INSTALLED]"
-            if grep -q "^load_mod_${mod_name}[ =]*true" "$WORLD_MT" 2>/dev/null; then
+            if [ "$mod_enabled" = true ]; then
                 status_tag="[INSTALLED] [ENABLED]"
             fi
+            
             echo "[$((i + 1 + zip_count))] $status_tag $mod_name"
+            
+            if [ "$is_modpack" = true ]; then
+                submod_count=${#submods[@]}
+                for ((j=0; j<submod_count; j++)); do
+                    prefix="    ├──"
+                    if [ "$j" -eq "$((submod_count - 1))" ]; then
+                        prefix="    └──"
+                    fi
+                    echo "$prefix ${submod_statuses[$j]} ${submods[$j]}"
+                done
+            fi
         done
         
         read -p "your choice : " -r CHOICE
@@ -305,124 +346,41 @@ if [[ "$INTERACTIVE" == true ]]; then
             continue
         fi
 
-        TEMP_ZIP=$(mktemp)
         DOWNLOAD_SUCCESS=false
+        TEMP_ZIP=""
 
         if [[ "$CHOICE" -eq 0 ]]; then
-            echo "Please provide the direct .zip download link of the mod:"
-            read -p "URL ==> " -r MOD_INPUT
+            echo "Please provide the ContentDB URL or package ID (author/name):"
+            read -p "URL or ID ==> " -r MOD_INPUT
             
             if [[ -z "$MOD_INPUT" ]]; then
-                print_error "No URL provided."
-                rm -f "$TEMP_ZIP"
+                print_error "No URL or ID provided."
                 continue
             fi
             
-            print_info "Downloading mod from URL..."
-            if curl -sL "$MOD_INPUT" -o "$TEMP_ZIP"; then
-                DOWNLOAD_SUCCESS=true
-            else
-                print_error "Failed to download the mod."
-            fi
+            print_info "Running recursive dependency installer..."
+            SCRIPT="$PROJECT_ROOT/scripts/server/install-mod.py"
+            python3 "$SCRIPT" "$MOD_INPUT" --mods-dir "$MODS_DIR" --world-mt "$WORLD_MT"
+            echo
+            continue
         elif [[ "$CHOICE" -le "$zip_count" ]]; then
             FILE_INDEX=$((CHOICE - 1))
             LOCAL_FILE="${local_zips[$FILE_INDEX]}"
-            print_info "Using local mod archive: $(basename "$LOCAL_FILE")"
-            cp "$LOCAL_FILE" "$TEMP_ZIP"
-            DOWNLOAD_SUCCESS=true
+            print_info "Running local mod installer and dependency resolver..."
+            SCRIPT="$PROJECT_ROOT/scripts/server/install-mod.py"
+            python3 "$SCRIPT" "$LOCAL_FILE" --mods-dir "$MODS_DIR" --world-mt "$WORLD_MT"
+            echo
+            continue
         else
             MOD_INDEX=$((CHOICE - 1 - zip_count))
             SELECTED_MOD="${installed_mods[$MOD_INDEX]}"
             
-            if grep -q "^load_mod_${SELECTED_MOD}[ =]" "$WORLD_MT"; then
-                read -p "Mod '$SELECTED_MOD' is already configured in world.mt. Overwrite and activate? (y/n) " -n 1 -r
-                echo
-                if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
-                    rm -f "$TEMP_ZIP"
-                    echo
-                    continue
-                fi
-                grep -v "^load_mod_${SELECTED_MOD}[ =]" "$WORLD_MT" > "${WORLD_MT}.tmp" && mv "${WORLD_MT}.tmp" "$WORLD_MT"
-            fi
-            
-            echo "load_mod_${SELECTED_MOD} = true" >> "$WORLD_MT"
-            print_info "Activated installed mod '$SELECTED_MOD' in world.mt"
-            
-            if [ -f "$MODS_DIR/$SELECTED_MOD/mod.conf" ]; then
-                DEPENDS=$(grep -i -E '^[ \t]*depends[ \t]*=' "$MODS_DIR/$SELECTED_MOD/mod.conf" | cut -d'=' -f2- | xargs)
-                if [ -n "$DEPENDS" ]; then
-                    print_warning "This mod depends on other mods: $DEPENDS"
-                    print_warning "Please ensure they are installed before starting the server."
-                fi
-            fi
-            
-            rm -f "$TEMP_ZIP"
+            print_info "Toggling activation for installed mod '$SELECTED_MOD'..."
+            SCRIPT="$PROJECT_ROOT/scripts/server/install-mod.py"
+            python3 "$SCRIPT" --toggle "$SELECTED_MOD" --mods-dir "$MODS_DIR" --world-mt "$WORLD_MT"
             echo
             continue
         fi
-
-        if [[ "$DOWNLOAD_SUCCESS" == true ]]; then
-            MOD_EXTRACT_DIR=$(mktemp -d)
-            if unzip -q "$TEMP_ZIP" -d "$MOD_EXTRACT_DIR"; then
-                # Find the actual mod directory inside (often nested)
-                MOD_ROOT_DIR=$(find "$MOD_EXTRACT_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)
-                
-                if [[ -n "$MOD_ROOT_DIR" ]]; then
-                    MOD_NAME=$(basename "$MOD_ROOT_DIR")
-                    
-                    # Remove trailing -master or version tags commonly found in downloaded zips
-                    CLEAN_MOD_NAME=$(echo "$MOD_NAME" | sed -E 's/-[0-9a-fA-F]+$|-master$//')
-                    
-                    TARGET_MOD_DIR="$MODS_DIR/$CLEAN_MOD_NAME"
-                    
-                    if [ -d "$TARGET_MOD_DIR" ]; then
-                        read -p "Mod '$CLEAN_MOD_NAME' files already exist. Overwrite? (y/n) " -n 1 -r
-                        echo
-                        if [[ "$REPLY" =~ ^[Yy]$ ]]; then
-                            print_warning "Overwriting..."
-                            rm -rf "$TARGET_MOD_DIR"
-                            mv "$MOD_ROOT_DIR" "$TARGET_MOD_DIR"
-                            print_info "Installed mod to $TARGET_MOD_DIR"
-                        else
-                            print_info "Skipped overwriting mod files."
-                        fi
-                    else
-                        mv "$MOD_ROOT_DIR" "$TARGET_MOD_DIR"
-                        print_info "Installed mod to $TARGET_MOD_DIR"
-                    fi
-                    
-                    # Ensure mod is enabled in world.mt
-                    if grep -q "^load_mod_${CLEAN_MOD_NAME}[ =]" "$WORLD_MT"; then
-                        read -p "Mod '$CLEAN_MOD_NAME' is already configured in world.mt. Overwrite and activate? (y/n) " -n 1 -r
-                        echo
-                        if [[ "$REPLY" =~ ^[Yy]$ ]]; then
-                            grep -v "^load_mod_${CLEAN_MOD_NAME}[ =]" "$WORLD_MT" > "${WORLD_MT}.tmp" && mv "${WORLD_MT}.tmp" "$WORLD_MT"
-                            echo "load_mod_${CLEAN_MOD_NAME} = true" >> "$WORLD_MT"
-                            print_info "Enabled mod '$CLEAN_MOD_NAME' in world.mt"
-                        else
-                            print_info "Skipped enabling mod in world.mt."
-                        fi
-                    else
-                        echo "load_mod_${CLEAN_MOD_NAME} = true" >> "$WORLD_MT"
-                        print_info "Enabled mod '$CLEAN_MOD_NAME' in world.mt"
-                    fi
-                    
-                    if [ -f "$TARGET_MOD_DIR/mod.conf" ]; then
-                        DEPENDS=$(grep -i -E '^[ \t]*depends[ \t]*=' "$TARGET_MOD_DIR/mod.conf" | cut -d'=' -f2- | xargs)
-                        if [ -n "$DEPENDS" ]; then
-                            print_warning "This recently installed mod depends on other mods: $DEPENDS"
-                            print_warning "Please ensure they are installed before starting the server."
-                        fi
-                    fi
-                else
-                    print_error "Could not find a valid mod directory in the downloaded zip."
-                fi
-            else
-                print_error "Failed to extract the mod zip."
-            fi
-            rm -rf "$MOD_EXTRACT_DIR"
-        fi
-        rm -f "$TEMP_ZIP"
         echo
     done
 fi
