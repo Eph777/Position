@@ -23,9 +23,6 @@
 # Load common functions
 PROJECT_ROOT=$(cat /root/.proj_root)
 source $PROJECT_ROOT/src/lib/common.sh
-
-/scripts/server
-
 # Defaults
 WORLD=""
 PORT=30000
